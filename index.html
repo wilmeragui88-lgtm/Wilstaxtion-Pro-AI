@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Wilstaxtion Pro 2026 - </title>
+    <title>Wilstaxtion Pro 2026</title>
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css" />
@@ -36,7 +36,7 @@
 
         .btn-salir {
             position: absolute; top: 15px; right: 15px; z-index: 5000;
-            background: rgba(231, 76, 60, 0.2); color: var(--danger); border: 1px solid var(--danger);
+            background: rgba(231, 76, 60, 0.2); color: #ff4d4d; border: 1px solid var(--danger);
             padding: 8px 15px; border-radius: 10px; font-weight: bold; font-size: 12px;
         }
 
@@ -81,11 +81,11 @@
 
         .status-circle {
             width: 130px; height: 130px; border-radius: 50%; border: 10px solid #1e293b;
-            font-size: 22px; font-weight: 900; margin: 20px auto;
+            font-size: 24px; font-weight: 900; margin: 20px auto;
             display: flex; align-items: center; justify-content: center; cursor: pointer;
             transition: 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
-        .status-circle.on { background: var(--primary); color: var(--dark); box-shadow: 0 0 40px rgba(46, 204, 113, 0.4); transform: scale(1.05); }
+        .status-circle.on { background: var(--primary); color: #000; box-shadow: 0 0 40px rgba(46, 204, 113, 0.4); transform: scale(1.05); }
         .status-circle.off { background: #1e293b; color: #4b5563; }
 
         #tripAlert {
@@ -98,20 +98,35 @@
 
         .pulse-wait { animation: pulse-blue 2s infinite; }
         @keyframes pulse-blue { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.1); opacity: 0.7; } 100% { transform: scale(1); opacity: 1; } }
+
+        /* CORRECCIÓN DE LEGIBILIDAD EN BOTÓN AZUL */
+        #routeInfo {
+            background: var(--secondary);
+            color: #ffffff !important; /* Texto Blanco Forzado */
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: bold;
+            margin-top: 10px;
+            display: none;
+            text-transform: uppercase;
+            box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
+        }
     </style>
 </head>
 <body class="safe-area">
 
 <div id="splash">
     <div class="loader"></div>
-    <h1 style="letter-spacing: 5px; font-size: 24px;">TAXITON <span style="color:var(--primary)">PRO</span></h1>
-    <p style="color:var(--slate); margin-top:10px; font-size: 12px;">INICIANDO SISTEMA...</p>
+    <h1 style="letter-spacing: 5px; font-size: 24px;">WILSTAXTION <span style="color:var(--primary)">PRO</span></h1>
+    <p style="color:#64748b; margin-top:10px; font-size: 12px;">INICIANDO SISTEMA...</p>
 </div>
 
 <button id="mainLogoutBtn" class="btn-salir" style="display: none;" onclick="quickLogout()">SALIR</button>
 
 <div id="authScreen" class="full-screen">
-    <h2 style="margin-bottom: 30px;">Bienvenido, </h2>
+    <h2 style="margin-bottom: 30px; color: var(--primary);">WILSTAXTION PRO</h2>
+    <p style="margin-bottom: 20px; color: #94a3b8;">Bienvenido al futuro del transporte</p>
     <div class="role-selector" style="display:flex; gap:10px; width:100%; max-width:340px; margin-bottom:20px;">
         <div class="role-btn active" id="btnRP" onclick="setRole('pasajero')">PASAJERO</div>
         <div class="role-btn" id="btnRT" onclick="setRole('taxi')">TAXISTA</div>
@@ -134,7 +149,7 @@
     <div style="height:40vh; display:flex; flex-direction:column; justify-content:center; align-items:center;">
         <div class="status-circle off" id="statusToggle" onclick="toggleWork()">OFF</div>
         <p id="statusLabel" style="color:var(--primary); font-weight:bold; margin-top:10px;">MODO ESPERA</p>
-        <div id="routeInfo" style="background:var(--secondary); padding:5px 15px; border-radius:20px; font-size:12px; margin-top:10px; display:none;"></div>
+        <div id="routeInfo">0 MINUTOS AL CLIENTE</div>
     </div>
     <div id="miniMapContainer" style="flex:1; display:none; position:relative;">
         <div id="miniMap" style="height:100%; width:100%;"></div>
@@ -146,9 +161,9 @@
 
     <div id="tripAlert">
         <h2 style="color:var(--secondary)">¡NUEVO PEDIDO!</h2>
-        <p id="clientName" style="margin:15px 0; font-size:20px;"></p>
-        <button onclick="respondTrip('aceptado')" style="width:100%; padding:20px; background:var(--primary); border:none; border-radius:15px; font-weight:bold; font-size:18px;">ACEPTAR VIAJE</button>
-        <button onclick="respondTrip('rechazado')" style="width:100%; margin-top:10px; background:transparent; border:none; color:var(--danger);">Rechazar</button>
+        <p id="clientName" style="margin:15px 0; font-size:20px; font-weight: bold;"></p>
+        <button onclick="respondTrip('aceptado')" style="width:100%; padding:20px; background:var(--primary); border:none; border-radius:15px; font-weight:bold; font-size:18px; color: #000;">ACEPTAR VIAJE</button>
+        <button onclick="respondTrip('rechazado')" style="width:100%; margin-top:10px; background:transparent; border:none; color:var(--danger); font-weight: bold;">RECHAZAR</button>
     </div>
 </div>
 
@@ -180,13 +195,17 @@
     const sndAlerta = new Audio('https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3');
     const sndClick = new Audio('https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3');
 
-    // Ocultar Splash al cargar
-    window.onload = () => setTimeout(() => document.getElementById('splash').style.opacity = '0', 2000);
-    window.onload = () => setTimeout(() => document.getElementById('splash').style.display = 'none', 2800);
+    window.onload = () => setTimeout(() => {
+        const splash = document.getElementById('splash');
+        splash.style.opacity = '0';
+        setTimeout(() => splash.style.display = 'none', 800);
+    }, 2000);
 
     function hablar(m) {
-        const u = new SpeechSynthesisUtterance(m); u.lang = 'es-ES'; u.rate = 0.9;
-        window.speechSynthesis.speak(u);
+        if ('speechSynthesis' in window) {
+            const u = new SpeechSynthesisUtterance(m); u.lang = 'es-ES'; u.rate = 0.9;
+            window.speechSynthesis.speak(u);
+        }
     }
 
     window.setRole = (r) => {
@@ -196,7 +215,7 @@
         document.getElementById('btnRT').classList.toggle('active', r === 'taxi');
         document.getElementById('loginFields').innerHTML = r === 'pasajero' ? 
             `<input type="text" id="p-name" placeholder="Tu Nombre">` : 
-            `<input type="email" id="t-email" placeholder="Correo"><input type="password" id="t-pass" placeholder="Password">`;
+            `<input type="email" id="t-email" placeholder="Correo"><input type="password" id="t-pass" placeholder="Contraseña">`;
     };
 
     window.handleAuth = async () => {
@@ -207,6 +226,7 @@
             await signInAnonymously(auth);
         } else {
             const e = document.getElementById('t-email').value, p = document.getElementById('t-pass').value;
+            if(!e || !p) return alert("Completa tus datos");
             try { await signInWithEmailAndPassword(auth, e, p); } catch { alert("Error de acceso"); }
         }
     };
@@ -238,14 +258,14 @@
                 snap.forEach(d => {
                     const t = d.data();
                     const card = document.createElement('div'); card.className = "taxi-card";
-                    card.innerHTML = `<div><b style="color:var(--primary)">${t.nombre}</b><br><small>${t.auto}</small></div>
-                        <button class="btn-entrar" style="width:auto; padding:10px 20px; margin:0;" onclick="requestRide('${d.id}', '${t.nombre}')">PEDIR</button>`;
+                    card.innerHTML = `<div><b style="color:var(--primary)">${t.nombre}</b><br><small style="color:#94a3b8">${t.auto || 'Taxi Disponible'}</small></div>
+                        <button class="btn-entrar" style="width:auto; padding:10px 20px; margin:0; font-size:12px;" onclick="requestRide('${d.id}', '${t.nombre}')">PEDIR</button>`;
                     list.appendChild(card);
                     if(markers[d.id]) markers[d.id].setLatLng([t.lat, t.lng]);
-                    else markers[d.id] = L.marker([t.lat, t.lng], {icon: L.divIcon({html:'🚕', className:'t-icon'})}).addTo(map);
+                    else markers[d.id] = L.marker([t.lat, t.lng], {icon: L.divIcon({html:'🚕', className:'t-icon', iconSize: [30, 30]})}).addTo(map);
                 });
             });
-        }, null, {enableHighAccuracy: true});
+        }, () => alert("Activa el GPS"), {enableHighAccuracy: true});
     }
 
     window.requestRide = async (taxiId, taxiName) => {
@@ -264,7 +284,7 @@
         onSnapshot(doc(db, "viajes", docRef.id), s => {
             if(!s.exists()) { hablar("Servicio terminado"); location.reload(); return; }
             if(s.data().status === 'aceptado') {
-                hablar("Viaje aceptado, Wil. El taxista va en camino.");
+                hablar("Viaje aceptado. El taxista va en camino.");
                 document.getElementById('pPanel').innerHTML = `<div style="text-align:center; padding:40px; border:2px solid var(--primary); border-radius:25px; background:rgba(46,204,113,0.1)">
                     <h1 style="color:var(--primary)">¡CONFIRMADO!</h1>
                     <p style="margin:10px 0; font-size:18px;">${taxiName} está en ruta a tu ubicación.</p>
@@ -286,9 +306,9 @@
             if (!snap.empty) {
                 sndAlerta.play(); 
                 const v = snap.docs[0]; window.activeTripId = v.id; window.pLoc = [v.data().lat, v.data().lng];
-                document.getElementById('clientName').innerText = v.data().pasajeroNombre;
+                document.getElementById('clientName').innerText = "Cliente: " + v.data().pasajeroNombre;
                 document.getElementById('tripAlert').style.display = 'block';
-                hablar("Tienes un nuevo cliente, Wil. Es " + v.data().pasajeroNombre);
+                hablar("Wil, tienes un nuevo pedido de " + v.data().pasajeroNombre);
             }
         });
     }
@@ -348,6 +368,11 @@
             if(routingControl) miniMap.removeControl(routingControl);
             hablar("Viaje completado.");
         }
+    };
+
+    window.nextMapStyle = () => {
+        mapStyleIdx = (mapStyleIdx + 1) % styles.length;
+        L.tileLayer(styles[mapStyleIdx]).addTo(miniMap);
     };
 </script>
 </body>
