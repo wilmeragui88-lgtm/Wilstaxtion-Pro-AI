@@ -91,12 +91,24 @@
         .status-circle.on { background: var(--primary); color: var(--dark); box-shadow: 0 0 40px rgba(46, 204, 113, 0.4); transform: scale(1.05); }
         .status-circle.off { background: #1e293b; color: #4b5563; }
 
+        /* VENTANA DE ALERTA CORREGIDA POR GEMINI */
         #tripAlert {
             position: fixed; bottom: 30px; left: 20px; right: 20px;
-            background: #ffffff; color: #000; padding: 25px;
+            background: #ffffff; 
+            color: #000000 !important; /* Texto negro forzado */
+            padding: 25px;
             border-radius: 25px; z-index: 10000; display: none;
             box-shadow: 0 20px 60px rgba(0,0,0,0.8); animation: slideUp 0.5s ease;
+            text-align: center;
         }
+
+        #clientName {
+            color: #000000 !important; /* Nombre en negro */
+            margin: 15px 0; 
+            font-size: 24px; 
+            font-weight: 900;
+        }
+
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 
         .pulse-wait { animation: pulse-blue 2s infinite; }
@@ -107,14 +119,14 @@
 
 <div id="splash">
     <div class="loader"></div>
-    <h1 style="letter-spacing: 5px; font-size: 24px;">TAXITON <span style="color:var(--primary)">PRO</span></h1>
+    <h1 style="letter-spacing: 5px; font-size: 24px;">WILSTAXTION <span style="color:var(--primary)">PRO</span></h1>
     <p style="color:white; margin-top:10px; font-size: 12px;">INICIANDO SISTEMA...</p>
 </div>
 
 <button id="mainLogoutBtn" class="btn-salir" style="display: none;" onclick="quickLogout()">SALIR</button>
 
 <div id="authScreen" class="full-screen">
-    <h2 style="margin-bottom: 30px;">Bienvenido</h2>
+    <h2 style="margin-bottom: 30px; color: var(--primary);">WILSTAXTION PRO</h2>
     <div class="role-selector" style="display:flex; gap:10px; width:100%; max-width:340px; margin-bottom:20px;">
         <div class="role-btn active" id="btnRP" onclick="setRole('pasajero')">PASAJERO</div>
         <div class="role-btn" id="btnRT" onclick="setRole('taxi')">TAXISTA</div>
@@ -137,21 +149,20 @@
     <div style="height:40vh; display:flex; flex-direction:column; justify-content:center; align-items:center;">
         <div class="status-circle off" id="statusToggle" onclick="toggleWork()">OFF</div>
         <p id="statusLabel" style="color:var(--primary); font-weight:bold; margin-top:10px;">MODO ESPERA</p>
-        <div id="routeInfo" style="background:var(--secondary); padding:5px 15px; border-radius:20px; font-size:12px; margin-top:10px; display:none;"></div>
+        <div id="routeInfo" style="background:var(--secondary); padding:5px 15px; border-radius:20px; font-size:12px; margin-top:10px; display:none; color: white;"></div>
     </div>
     <div id="miniMapContainer" style="flex:1; display:none; position:relative;">
         <div id="miniMap" style="height:100%; width:100%;"></div>
         <div style="position:absolute; top:10px; left:10px; z-index:1000; display:flex; flex-direction:column; gap:8px;">
-            <button class="btn-salir" style="position:static; background:var(--secondary); color:white; border:none;" onclick="nextMapStyle()">ESTILO</button>
             <button id="finishBtn" class="btn-salir" style="position:static; background:var(--danger); border:none; display:none;" onclick="finishTrip()">FINALIZAR</button>
         </div>
     </div>
 
     <div id="tripAlert">
-        <h2 style="color:var(--secondary)">¡NUEVO PEDIDO!</h2>
-        <p id="clientName" style="margin:15px 0; font-size:20px;"></p>
-        <button onclick="respondTrip('aceptado')" style="width:100%; padding:20px; background:var(--primary); border:none; border-radius:15px; font-weight:bold; font-size:18px;">ACEPTAR VIAJE</button>
-        <button onclick="respondTrip('rechazado')" style="width:100%; margin-top:10px; background:transparent; border:none; color:var(--danger);">Rechazar</button>
+        <h2 style="color:var(--secondary); font-weight: 900;">¡NUEVO PEDIDO!</h2>
+        <p id="clientName"></p>
+        <button onclick="respondTrip('aceptado')" style="width:100%; padding:20px; background:var(--primary); border:none; border-radius:15px; font-weight:bold; font-size:18px; color: #000; margin-bottom: 10px;">ACEPTAR VIAJE</button>
+        <button onclick="respondTrip('rechazado')" style="width:100%; background:transparent; border:none; color:var(--danger); font-weight: bold; font-size: 16px;">Rechazar</button>
     </div>
 </div>
 
@@ -159,6 +170,7 @@
 <script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
 
 <script type="module">
+    // ... Tu lógica de Firebase igual a la anterior ...
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getAuth, signInAnonymously, onAuthStateChanged, signOut, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
     import { getFirestore, doc, getDoc, setDoc, deleteDoc, collection, onSnapshot, query, where, addDoc, serverTimestamp, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -356,7 +368,6 @@
         }
     };
 
-    // --- REGISTRO DEL SERVICE WORKER (EL MOTOR PWA) ---
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js')
