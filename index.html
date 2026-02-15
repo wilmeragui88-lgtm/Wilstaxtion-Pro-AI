@@ -3,86 +3,51 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TaxiApp</title>
+<title>Taxiton PRO</title>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 
 <style>
-*{
-  margin:0;
-  padding:0;
-  box-sizing:border-box;
-  font-family: 'Segoe UI', sans-serif;
-}
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',sans-serif;}
+body{background:#111;color:white;text-align:center;}
 
-/* ================= SPLASH SCREEN ================= */
-
+/* SPLASH */
 #splash{
-  position:fixed;
-  width:100%;
-  height:100vh;
-  background: linear-gradient(135deg,#000000,#1c1c1c,#ffcc00);
-  display:flex;
-  flex-direction:column;
-  justify-content:center;
-  align-items:center;
-  color:white;
-  z-index:1000;
-  transition:opacity 1s ease;
+position:fixed;width:100%;height:100vh;
+background:linear-gradient(135deg,#000,#1c1c1c,#ffcc00);
+display:flex;flex-direction:column;
+justify-content:center;align-items:center;
+z-index:3000;transition:1s;
 }
-
-.logo{
-  font-size:80px;
-  animation:float 2s infinite ease-in-out;
-}
-
+.logo{font-size:90px;animation:float 2s infinite;}
 @keyframes float{
-  0%{transform:translateY(0px);}
-  50%{transform:translateY(-15px);}
-  100%{transform:translateY(0px);}
+0%{transform:translateY(0);}
+50%{transform:translateY(-15px);}
+100%{transform:translateY(0);}
 }
-
-.app-name{
-  font-size:32px;
-  margin-top:15px;
-  font-weight:bold;
+button{
+width:90%;padding:14px;margin-top:10px;
+border:none;border-radius:30px;
+background:#ffcc00;font-weight:bold;font-size:16px;
 }
-
-.start-btn{
-  margin-top:40px;
-  padding:15px 40px;
-  background:#ffcc00;
-  border:none;
-  border-radius:30px;
-  font-size:18px;
-  font-weight:bold;
-  cursor:pointer;
-  transition:0.3s;
+input{
+width:90%;padding:12px;margin-top:10px;
+border:none;border-radius:8px;
 }
-
-.start-btn:hover{
-  transform:scale(1.1);
+.screen{display:none;padding:20px;}
+#map{height:100vh;width:100%;}
+.bottom-panel{
+position:absolute;bottom:0;width:100%;
+background:white;color:black;
+padding:15px;border-radius:25px 25px 0 0;
+z-index:2000;
 }
-
-/* ================= MAP ================= */
-
-#map{
-  height:100vh;
-  width:100%;
-  display:none;
-}
-
 .status{
-  position:absolute;
-  bottom:20px;
-  left:50%;
-  transform:translateX(-50%);
-  background:white;
-  padding:15px 25px;
-  border-radius:20px;
-  box-shadow:0 5px 15px rgba(0,0,0,0.3);
-  font-weight:bold;
-  z-index:500;
+position:absolute;top:20px;left:50%;
+transform:translateX(-50%);
+background:white;color:black;
+padding:10px 20px;border-radius:20px;
+z-index:2000;
 }
 </style>
 </head>
@@ -90,63 +55,201 @@
 
 <!-- SPLASH -->
 <div id="splash">
-  <div class="logo">🚖</div>
-  <div class="app-name">TaxiApp</div>
-  <button class="start-btn" onclick="startApp()">Iniciar</button>
+<div class="logo">🚖</div>
+<h2>Taxiton PRO</h2>
+<button onclick="mostrarLogin()">Iniciar</button>
 </div>
 
-<!-- MAPA -->
+<!-- LOGIN -->
+<div id="login" class="screen">
+<h2>Iniciar Sesión</h2>
+<input type="email" id="email" placeholder="Correo">
+<input type="password" id="password" placeholder="Contraseña">
+<button onclick="login()">Entrar</button>
+</div>
+
+<!-- ROLE -->
+<div id="role" class="screen">
+<h2>Selecciona modo</h2>
+<button onclick="modoConductor()">👨‍✈️ Conductor</button>
+<button onclick="modoPasajero()">👤 Pasajero</button>
+</div>
+
+<!-- MAP -->
+<div id="mapScreen" class="screen">
 <div id="map"></div>
-<div class="status" id="status">Esperando ubicación...</div>
+<div class="status" id="status">Conectando...</div>
+<div class="bottom-panel" id="panel" style="display:none;">
+<button onclick="solicitarTaxi()">Solicitar Taxi 🚖</button>
+<div id="tripInfo"></div>
+</div>
+</div>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
-<script>
-let map;
-let userMarker;
+<script type="module">
 
-/* ================= INICIAR APP ================= */
-function startApp(){
-  document.getElementById("splash").style.opacity="0";
-  setTimeout(()=>{
-    document.getElementById("splash").style.display="none";
-    document.getElementById("map").style.display="block";
-    initMap();
-  },1000);
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, doc, setDoc, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+/* 🔥 TU CONFIG YA INTEGRADA 🔥 */
+const firebaseConfig = {
+  apiKey: "AIzaSyCw7WoC5AjqnZ2_vagJs5ZklOZt3b4ZRtg",
+  authDomain: "taxiton-eba22.firebaseapp.com",
+  projectId: "taxiton-eba22",
+  storageBucket: "taxiton-eba22.firebasestorage.app",
+  messagingSenderId: "1091576841981",
+  appId: "1:1091576841981:web:1dd7bbefb518580fb76094"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+let map,userMarker,markers={},nearestTaxi,routeLine;
+
+/* UI */
+window.mostrarLogin=function(){
+document.getElementById("splash").style.display="none";
+document.getElementById("login").style.display="block";
 }
 
-/* ================= MAPA ================= */
-function initMap(){
-
-  map = L.map('map').setView([13.6929,-89.2182],13);
-
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-    attribution:'© OpenStreetMap'
-  }).addTo(map);
-
-  if(navigator.geolocation){
-    navigator.geolocation.watchPosition(position=>{
-      const lat = position.coords.latitude;
-      const lng = position.coords.longitude;
-
-      if(!userMarker){
-        userMarker = L.marker([lat,lng]).addTo(map)
-          .bindPopup("📍 Tu ubicación")
-          .openPopup();
-      }else{
-        userMarker.setLatLng([lat,lng]);
-      }
-
-      map.setView([lat,lng],15);
-      updateStatus("📍 Ubicación detectada");
-    });
-  }
+window.login=async function(){
+try{
+await signInWithEmailAndPassword(auth,
+document.getElementById("email").value,
+document.getElementById("password").value
+);
+document.getElementById("login").style.display="none";
+document.getElementById("role").style.display="block";
+}catch(e){
+alert("Usuario no existe. Créalo en Firebase Authentication.");
+}
 }
 
-function updateStatus(text){
-  document.getElementById("status").innerText = text;
+/* MAP INIT */
+function iniciarMapa(){
+document.getElementById("role").style.display="none";
+document.getElementById("mapScreen").style.display="block";
+
+map=L.map('map').setView([13.69,-89.21],13);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+navigator.geolocation.watchPosition(pos=>{
+const lat=pos.coords.latitude;
+const lng=pos.coords.longitude;
+
+if(!userMarker){
+userMarker=L.marker([lat,lng]).addTo(map);
+}else{
+userMarker.setLatLng([lat,lng]);
 }
+
+map.setView([lat,lng],15);
+document.getElementById("status").innerText="📍 Ubicación detectada";
+
+},{enableHighAccuracy:true});
+}
+
+/* CONDUCTOR */
+window.modoConductor=function(){
+iniciarMapa();
+
+navigator.geolocation.watchPosition(async pos=>{
+await setDoc(doc(db,"drivers",auth.currentUser.uid),{
+lat:pos.coords.latitude,
+lng:pos.coords.longitude,
+available:true,
+updatedAt:Date.now()
+});
+});
+}
+
+/* PASAJERO */
+window.modoPasajero=function(){
+iniciarMapa();
+document.getElementById("panel").style.display="block";
+
+onSnapshot(collection(db,"drivers"),snapshot=>{
+snapshot.docChanges().forEach(change=>{
+const data=change.doc.data();
+const id=change.doc.id;
+
+if(change.type==="added"||change.type==="modified"){
+if(markers[id]){
+markers[id].setLatLng([data.lat,data.lng]);
+}else{
+markers[id]=L.marker([data.lat,data.lng],{
+icon:L.divIcon({html:"🚖",className:"",iconSize:[30,30]})
+}).addTo(map);
+}
+}
+});
+});
+}
+
+/* SOLICITAR TAXI */
+window.solicitarTaxi=function(){
+
+let min=Infinity;
+
+Object.values(markers).forEach(marker=>{
+const d=map.distance(userMarker.getLatLng(),marker.getLatLng());
+if(d<min){
+min=d;
+nearestTaxi=marker;
+}
+});
+
+if(!nearestTaxi)return;
+
+dibujarRuta();
+moverTaxi();
+}
+
+/* RUTA */
+function dibujarRuta(){
+if(routeLine)map.removeLayer(routeLine);
+routeLine=L.polyline([
+nearestTaxi.getLatLng(),
+userMarker.getLatLng()
+],{color:'green'}).addTo(map);
+}
+
+/* MOVER TAXI */
+function moverTaxi(){
+const interval=setInterval(()=>{
+const taxiPos=nearestTaxi.getLatLng();
+const userPos=userMarker.getLatLng();
+
+const newLat=taxiPos.lat+(userPos.lat-taxiPos.lat)*0.05;
+const newLng=taxiPos.lng+(userPos.lng-taxiPos.lng)*0.05;
+
+nearestTaxi.setLatLng([newLat,newLng]);
+dibujarRuta();
+
+const dist=map.distance(nearestTaxi.getLatLng(),userPos);
+
+if(dist<10){
+clearInterval(interval);
+mostrarInfo(dist);
+}
+},200);
+}
+
+/* INFO */
+function mostrarInfo(distance){
+const km=(distance/1000).toFixed(2);
+const tarifa=(2+km*0.75).toFixed(2);
+const tiempo=(km/0.5).toFixed(0);
+
+document.getElementById("tripInfo").innerHTML=
+`📏 ${km} km<br>
+⏱ ${tiempo} min<br>
+💰 $${tarifa}`;
+}
+
 </script>
-
 </body>
 </html>
