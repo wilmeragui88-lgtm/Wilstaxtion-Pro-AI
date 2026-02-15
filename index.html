@@ -3,83 +3,82 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Taxiton Pro - Registro Inteligente</title>
+    <title>Taxiton Pro - Sistema de Viajes</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
     <style>
-        :root { --primary: #22c55e; --dark: #0f172a; --slate: #64748b; }
+        :root { --primary: #22c55e; --dark: #0f172a; --slate: #64748b; --accent: #3b82f6; }
         * { margin:0; padding:0; box-sizing:border-box; font-family: 'Segoe UI', sans-serif; }
         body { background: #f1f5f9; height: 100vh; overflow: hidden; }
 
-        /* --- LOGIN & ROL --- */
+        /* --- COMUNES --- */
         .full-screen { position: fixed; inset: 0; background: var(--dark); z-index: 9000; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 25px; color: white; }
-        .role-box { display: flex; gap: 10px; margin-bottom: 20px; width: 100%; max-width: 320px; }
-        .role-btn { flex:1; padding: 15px; border: 2px solid #334155; border-radius: 12px; cursor: pointer; text-align: center; font-weight: bold; }
-        .role-btn.active { border-color: var(--primary); background: rgba(34, 197, 94, 0.1); }
-        
-        input, select { width: 100%; max-width: 320px; padding: 15px; margin: 8px 0; border-radius: 12px; border: none; font-size: 16px; }
-        .btn-main { width: 100%; max-width: 320px; padding: 15px; background: var(--primary); border: none; border-radius: 12px; color: white; font-weight: bold; cursor: pointer; }
+        .btn-main { width: 100%; max-width: 320px; padding: 15px; background: var(--primary); border: none; border-radius: 12px; color: white; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .btn-main:active { transform: scale(0.95); }
+        input { width: 100%; max-width: 320px; padding: 15px; margin: 8px 0; border-radius: 12px; border: none; font-size: 16px; }
 
-        /* --- PERFIL TAXISTA (PASO EXTRA) --- */
-        #taxiProfileStep { display: none; text-align: center; }
-
-        /* --- INTERFACES PRINCIPALES --- */
+        /* --- PASAJERO --- */
         #passengerApp, #taxiApp { display: none; height: 100vh; }
-        
-        /* Estilos Pasajero */
         #map { height: 60vh; width: 100%; }
-        .p-panel { height: 40vh; background: white; border-radius: 25px 25px 0 0; margin-top: -20px; position: relative; z-index: 10; padding: 20px; box-shadow: 0 -5px 15px rgba(0,0,0,0.1); }
+        .p-panel { height: 40vh; background: white; border-radius: 25px 25px 0 0; margin-top: -20px; position: relative; z-index: 10; padding: 20px; overflow-y: auto; }
+        .taxi-card { display: flex; align-items: center; justify-content: space-between; padding: 15px; background: #f8fafc; border-radius: 16px; margin-bottom: 10px; border: 1px solid #e2e8f0; }
+        .btn-request { background: var(--accent); color: white; border: none; padding: 8px 15px; border-radius: 8px; font-weight: bold; cursor: pointer; }
 
-        /* Estilos Taxista */
+        /* --- TAXISTA --- */
         .t-dashboard { padding: 40px 20px; text-align: center; color: white; background: var(--dark); height: 100vh; }
-        .status-btn { width: 140px; height: 140px; border-radius: 50%; border: 8px solid #1e293b; font-size: 20px; font-weight: bold; margin: 40px auto; cursor: pointer; transition: 0.3s; }
+        .status-btn { width: 140px; height: 140px; border-radius: 50%; border: 8px solid #1e293b; font-size: 20px; font-weight: bold; margin: 40px auto; cursor: pointer; display: flex; align-items: center; justify-content: center; }
         .status-btn.off { background: #475569; color: #cbd5e1; }
-        .status-btn.on { background: var(--primary); color: white; box-shadow: 0 0 30px rgba(34, 197, 94, 0.5); border-color: #14532d; }
+        .status-btn.on { background: var(--primary); color: white; box-shadow: 0 0 30px rgba(34, 197, 94, 0.5); }
+
+        /* --- ALERTA DE NUEVO VIAJE (MODAL) --- */
+        #tripAlert {
+            position: fixed; top: 20px; left: 20px; right: 20px; 
+            background: white; color: var(--dark); padding: 20px; 
+            border-radius: 20px; z-index: 10000; display: none;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5); border-left: 8px solid var(--accent);
+        }
     </style>
 </head>
 <body>
 
 <div id="authScreen" class="full-screen">
-    <h1 style="margin-bottom: 10px;">TAXITON PRO</h1>
-    <p style="color: var(--slate); margin-bottom: 25px;">Bienvenido al transporte del futuro</p>
-    
-    <div class="role-box">
-        <div class="role-btn active" onclick="selectRole('pasajero')" id="rP">👤 Pasajero</div>
-        <div class="role-btn" onclick="selectRole('taxi')" id="rT">🚕 Taxista</div>
+    <h1 style="margin-bottom: 20px;">TAXITON PRO</h1>
+    <div style="display:flex; gap:10px; margin-bottom:20px;">
+        <button class="role-btn" id="rP" onclick="setRole('pasajero')" style="padding:10px 20px; border-radius:10px; border:none; background:#334155; color:white;">👤 Pasajero</button>
+        <button class="role-btn" id="rT" onclick="setRole('taxi')" style="padding:10px 20px; border-radius:10px; border:none; background:#334155; color:white;">🚕 Taxista</button>
     </div>
-
     <input type="email" id="email" placeholder="Email">
     <input type="password" id="pass" placeholder="Contraseña">
     <button class="btn-main" onclick="entrar()">INGRESAR</button>
 </div>
 
-<div id="taxiProfileStep" class="full-screen">
-    <h2>Configura tu Unidad</h2>
-    <p style="color: var(--slate); margin-bottom: 20px;">Completa los datos para recibir pasajeros</p>
-    <input type="text" id="t-nombre" placeholder="Tu Nombre Completo">
-    <input type="text" id="t-auto" placeholder="Modelo del Auto (Ej: Kia Forte)">
-    <input type="text" id="t-placa" placeholder="Número de Placa">
-    <button class="btn-main" onclick="guardarPerfilTaxi()">FINALIZAR REGISTRO</button>
-</div>
-
 <div id="passengerApp">
     <div id="map"></div>
     <div class="p-panel">
-        <h3 style="margin-bottom: 15px;">Taxis activos ahora</h3>
+        <h3 style="margin-bottom: 15px;">Taxis en línea</h3>
         <div id="listaTaxis"></div>
     </div>
 </div>
 
 <div id="taxiApp" class="t-dashboard">
-    <h2 id="welcomeDriver">Hola Conductor</h2>
-    <div class="status-btn off" id="mainToggle" onclick="toggleServicio()">DESCONECTADO</div>
-    <p id="statusMsg">Presiona para empezar a trabajar</p>
+    <h2 id="driverWelcome">Panel de Control</h2>
+    <div class="status-btn off" id="statusBtn" onclick="toggleOnline()">OFF</div>
+    <p id="statusLabel">Desconectado</p>
+    
+    <div id="tripAlert">
+        <h4>¡NUEVO VIAJE! 🚖</h4>
+        <p id="clientName">El cliente está esperando...</p>
+        <div style="display:flex; gap:10px; margin-top:15px;">
+            <button onclick="responderViaje('aceptado')" style="flex:1; padding:10px; background:var(--primary); color:white; border:none; border-radius:10px; font-weight:bold;">ACEPTAR</button>
+            <button onclick="responderViaje('rechazado')" style="flex:1; padding:10px; background:#ef4444; color:white; border:none; border-radius:10px; font-weight:bold;">RECHAZAR</button>
+        </div>
+    </div>
 </div>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-    import { getFirestore, doc, getDoc, setDoc, deleteDoc, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import { getFirestore, doc, setDoc, onSnapshot, collection, query, where, addDoc, serverTimestamp, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyCw7WoC5AjqnZ2_vagJs5ZklOZt3b4ZRtg",
@@ -94,116 +93,123 @@
     const auth = getAuth(app);
     const db = getFirestore(app);
 
-    let rolSeleccionado = 'pasajero';
-    let perfilCompletado = false;
-    let map, watchId;
+    let rol = 'pasajero';
+    let userCoords = null;
+    let watchId = null;
 
-    window.selectRole = (r) => {
-        rolSeleccionado = r;
-        document.getElementById('rP').className = r === 'pasajero' ? 'role-btn active' : 'role-btn';
-        document.getElementById('rT').className = r === 'taxi' ? 'role-btn active' : 'role-btn';
-    }
+    window.setRole = (r) => {
+        rol = r;
+        document.querySelectorAll('.role-btn').forEach(b => b.style.background = '#334155');
+        document.getElementById(r === 'pasajero' ? 'rP' : 'rT').style.background = '#22c55e';
+    };
 
-    window.entrar = async () => {
-        const mail = document.getElementById('email').value;
-        const pass = document.getElementById('pass').value;
-        try {
-            await signInWithEmailAndPassword(auth, mail, pass);
-        } catch (e) { alert("Error: Verifica tus credenciales"); }
-    }
+    window.entrar = () => {
+        const m = document.getElementById('email').value;
+        const p = document.getElementById('pass').value;
+        signInWithEmailAndPassword(auth, m, p).catch(() => alert("Error de acceso"));
+    };
 
-    onAuthStateChanged(auth, async (user) => {
-        if (user) {
+    onAuthStateChanged(auth, user => {
+        if(user) {
             document.getElementById('authScreen').style.display = 'none';
-            
-            if (rolSeleccionado === 'pasajero') {
-                abrirAppPasajero();
-            } else {
-                verificarPerfilTaxi(user.uid);
-            }
+            rol === 'pasajero' ? initPasajero() : initTaxista();
         }
     });
 
-    // --- LÓGICA PASAJERO (DIRECTO) ---
-    function abrirAppPasajero() {
+    // --- LÓGICA DEL PASAJERO ---
+    function initPasajero() {
         document.getElementById('passengerApp').style.display = 'block';
         navigator.geolocation.getCurrentPosition(p => {
-            const pos = [p.coords.latitude, p.coords.longitude];
-            map = L.map('map').setView(pos, 15);
+            userCoords = [p.coords.latitude, p.coords.longitude];
+            const map = L.map('map').setView(userCoords, 15);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-            L.circleMarker(pos, {radius: 8, color: '#3b82f6'}).addTo(map);
+            L.marker(userCoords).addTo(map).bindPopup("Tu ubicación");
 
+            // Escuchar taxis activos
             onSnapshot(collection(db, "activos"), snap => {
                 const list = document.getElementById('listaTaxis');
                 list.innerHTML = "";
                 snap.forEach(d => {
                     const t = d.data();
-                    const item = document.createElement('div');
-                    item.style = "padding:15px; background:#f8fafc; border-radius:12px; margin-bottom:10px; border:1px solid #e2e8f0";
-                    item.innerHTML = `<strong>🚕 ${t.nombre}</strong><br><small>${t.auto} | ${t.placa}</small>`;
-                    list.appendChild(item);
+                    const card = document.createElement('div');
+                    card.className = "taxi-card";
+                    card.innerHTML = `
+                        <div><strong>${t.nombre}</strong><br><small>${t.auto}</small></div>
+                        <button class="btn-request" onclick="solicitarTaxi('${d.id}', '${t.nombre}')">SOLICITAR</button>
+                    `;
+                    list.appendChild(card);
                 });
+            });
+        });
+
+        // Escuchar si mi solicitud fue aceptada
+        onSnapshot(query(collection(db, "viajes"), where("pasajeroId", "==", auth.currentUser.uid)), snap => {
+            snap.forEach(d => {
+                if(d.data().status === 'aceptado') alert("¡El taxista ha aceptado tu viaje y va en camino!");
             });
         });
     }
 
-    // --- LÓGICA TAXISTA (CON PASO DE PERFIL) ---
-    async function verificarPerfilTaxi(uid) {
-        const docRef = doc(db, "perfiles_taxistas", uid);
-        const docSnap = await getDoc(docRef);
+    window.solicitarTaxi = async (taxiId, nombreTaxi) => {
+        await addDoc(collection(db, "viajes"), {
+            pasajeroId: auth.currentUser.uid,
+            pasajeroNombre: auth.currentUser.email.split('@')[0],
+            taxiId: taxiId,
+            status: 'pendiente',
+            timestamp: serverTimestamp()
+        });
+        alert("Solicitud enviada a " + nombreTaxi);
+    };
 
-        if (docSnap.exists()) {
-            abrirAppTaxi(docSnap.data());
-        } else {
-            document.getElementById('taxiProfileStep').style.display = 'flex';
-        }
-    }
-
-    window.guardarPerfilTaxi = async () => {
-        const datos = {
-            nombre: document.getElementById('t-nombre').value,
-            auto: document.getElementById('t-auto').value,
-            placa: document.getElementById('t-placa').value,
-            uid: auth.currentUser.uid
-        };
-        
-        if(!datos.nombre || !datos.auto) return alert("Completa todos los campos");
-
-        await setDoc(doc(db, "perfiles_taxistas", auth.currentUser.uid), datos);
-        document.getElementById('taxiProfileStep').style.display = 'none';
-        abrirAppTaxi(datos);
-    }
-
-    function abrirAppTaxi(perfil) {
+    // --- LÓGICA DEL TAXISTA ---
+    function initTaxista() {
         document.getElementById('taxiApp').style.display = 'block';
-        document.getElementById('welcomeDriver').innerText = "Bienvenido, " + perfil.nombre;
-        window.datosPerfil = perfil;
+        
+        // Escuchar solicitudes para este taxista
+        onSnapshot(query(collection(db, "viajes"), where("taxiId", "==", auth.currentUser.uid), where("status", "==", "pendiente")), snap => {
+            if(!snap.empty) {
+                const viaje = snap.docs[0];
+                window.currentViajeId = viaje.id;
+                document.getElementById('clientName').innerText = "Cliente: " + viaje.data().pasajeroNombre;
+                document.getElementById('tripAlert').style.display = 'block';
+            } else {
+                document.getElementById('tripAlert').style.display = 'none';
+            }
+        });
     }
 
-    window.toggleServicio = async () => {
-        const btn = document.getElementById('mainToggle');
-        const isOff = btn.classList.contains('off');
+    window.responderViaje = async (estado) => {
+        const ref = doc(db, "viajes", window.currentViajeId);
+        if(estado === 'aceptado') {
+            await setDoc(ref, { status: 'aceptado' }, { merge: true });
+            alert("Viaje aceptado. Dirígete a la ubicación del cliente.");
+        } else {
+            await deleteDoc(ref);
+        }
+        document.getElementById('tripAlert').style.display = 'none';
+    };
 
-        if (isOff) {
-            btn.className = "status-btn on";
-            btn.innerText = "EN LÍNEA";
-            document.getElementById('statusMsg').innerText = "Los pasajeros pueden verte";
-            
-            watchId = navigator.geolocation.watchPosition(async p => {
-                await setDoc(doc(db, "activos", auth.currentUser.uid), {
-                    ...window.datosPerfil,
-                    lat: p.coords.latitude,
-                    lng: p.coords.longitude
+    window.toggleOnline = () => {
+        const btn = document.getElementById('statusBtn');
+        const isOff = btn.classList.contains('off');
+        
+        if(isOff) {
+            btn.className = "status-btn on"; btn.innerText = "ON";
+            document.getElementById('statusLabel').innerText = "En línea y visible";
+            watchId = navigator.geolocation.watchPosition(p => {
+                setDoc(doc(db, "activos", auth.currentUser.uid), {
+                    nombre: auth.currentUser.email.split('@')[0],
+                    auto: "Sedán Blanco 2026",
+                    lat: p.coords.latitude, lng: p.coords.longitude
                 });
             });
         } else {
-            btn.className = "status-btn off";
-            btn.innerText = "DESCONECTADO";
-            document.getElementById('statusMsg').innerText = "Presiona para trabajar";
+            btn.className = "status-btn off"; btn.innerText = "OFF";
+            document.getElementById('statusLabel').innerText = "Desconectado";
             navigator.geolocation.clearWatch(watchId);
-            await deleteDoc(doc(db, "activos", auth.currentUser.uid));
+            deleteDoc(doc(db, "activos", auth.currentUser.uid));
         }
-    }
+    };
 </script>
 </body>
 </html>
