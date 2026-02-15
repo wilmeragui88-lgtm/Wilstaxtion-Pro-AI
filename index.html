@@ -2,77 +2,76 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TAXITON PRO | Red Global</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TAXITON PRO | Full System</title>
 
-    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 
     <style>
-        :root { --p: #3b82f6; --s: #22c55e; --w: #f59e0b; --d: #0f172a; --bg: #f1f5f9; }
+        :root { --p: #3b82f6; --s: #22c55e; --w: #f59e0b; --d: #0f172a; --bg: #f8fafc; }
         * { margin:0; padding:0; box-sizing:border-box; font-family: 'Inter', sans-serif; }
-        body { background: var(--bg); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
-        
-        #map { height: 40vh; width: 100%; border-bottom: 2px solid #ddd; }
-        .panel { flex:1; background: white; border-radius: 25px 25px 0 0; padding: 20px; z-index: 1000; box-shadow: 0 -10px 25px rgba(0,0,0,0.1); overflow-y: auto; margin-top: -20px; }
+        body, html { height: 100%; width: 100%; overflow: hidden; }
 
-        /* Etiquetas de Estado */
-        .status-pill { display: inline-block; padding: 4px 10px; border-radius: 15px; font-size: 0.7rem; font-weight: bold; text-transform: uppercase; }
-        .online { background: #dcfce7; color: #15803d; }
-        .offline { background: #fee2e2; color: #b91c1c; }
-        .trip-active { background: #dbeafe; color: #1d4ed8; }
+        /* Mapa con altura fija inicial */
+        #map { height: 45vh; width: 100%; background: #e2e8f0; z-index: 1; }
 
-        /* Tarjetas de Registro y Taxi */
-        .card { background: #fff; border: 1px solid #e2e8f0; padding: 15px; border-radius: 16px; margin-bottom: 12px; }
-        .taxi-row { display: flex; justify-content: space-between; align-items: center; cursor: pointer; border: 1px solid #eee; padding: 12px; border-radius: 12px; margin-bottom: 8px; }
-        
-        .btn { width: 100%; padding: 14px; border: none; border-radius: 12px; font-weight: 700; cursor: pointer; margin-top: 10px; transition: 0.3s; }
+        .panel { 
+            height: 55vh; background: white; border-radius: 25px 25px 0 0; 
+            padding: 20px; z-index: 100; box-shadow: 0 -10px 25px rgba(0,0,0,0.1); 
+            overflow-y: auto; margin-top: -20px; position: relative;
+        }
+
+        /* Estados */
+        .status-pill { padding: 5px 12px; border-radius: 20px; font-size: 0.7rem; font-weight: bold; text-transform: uppercase; }
+        .pendiente { background: #fef3c7; color: #b45309; }
+        .aceptado { background: #dbeafe; color: #1d4ed8; }
+        .en_camino { background: #dcfce7; color: #15803d; }
+        .finalizado { background: #f1f5f9; color: #475569; }
+
+        /* Cards */
+        .card { background: #fff; border: 1px solid #e2e8f0; padding: 15px; border-radius: 16px; margin-bottom: 10px; }
+        .taxi-item { display: flex; justify-content: space-between; align-items: center; cursor: pointer; border: 1px solid #eee; padding: 15px; border-radius: 12px; margin-bottom: 10px; }
+
+        .btn { width: 100%; padding: 15px; border: none; border-radius: 12px; font-weight: 700; cursor: pointer; margin-top: 10px; }
         .btn-p { background: var(--p); color: white; }
         .btn-s { background: var(--s); color: white; }
-        .btn-outline { background: transparent; border: 2px solid var(--p); color: var(--p); }
 
-        .overlay { position: fixed; inset: 0; background: var(--d); z-index: 9999; display: flex; flex-direction: column; justify-content: center; padding: 30px; color: white; overflow-y: auto; }
+        .overlay { position: fixed; inset: 0; background: var(--d); z-index: 9999; display: flex; flex-direction: column; justify-content: center; padding: 30px; color: white; }
         .hidden { display: none !important; }
-        input, select { background: #1e293b; border: 1px solid #334155; padding: 15px; border-radius: 12px; color: white; margin-bottom: 12px; width: 100%; }
-        label { font-size: 0.8rem; color: #94a3b8; margin-bottom: 5px; display: block; }
+        input { background: #1e293b; border: 1px solid #334155; padding: 15px; border-radius: 12px; color: white; margin-bottom: 12px; width: 100%; }
     </style>
 </head>
 <body>
 
 <div id="roleScreen" class="overlay">
-    <h1 style="text-align:center; margin-bottom:30px;">🚖 TAXITON<span style="color:var(--p)">PRO</span></h1>
-    <button class="btn btn-p" onclick="showScreen('regDriverScreen')">QUIERO DAR TRANSPORTE</button>
-    <button class="btn btn-outline" style="margin-top:15px;" onclick="setRole('client')">NECESITO UN VIAJE</button>
-</div>
-
-<div id="regDriverScreen" class="overlay hidden">
-    <h2>Registro de Conductor</h2>
-    <label>Nombre Completo</label>
-    <input type="text" id="driverName" placeholder="Ej. Juan Pérez">
-    <label>Modelo del Vehículo</label>
-    <input type="text" id="carModel" placeholder="Ej. Toyota Prius - Azul">
-    <label>Placa</label>
-    <input type="text" id="carPlate" placeholder="Ej. P-12345">
-    <button class="btn btn-s" onclick="registerDriver()">COMPLETAR REGISTRO</button>
-    <button class="btn" style="background:transparent; color:gray;" onclick="showScreen('roleScreen')">Volver</button>
+    <h1 style="text-align:center; margin-bottom:30px;">TAXITON <span style="color:var(--p)">PRO</span></h1>
+    <button class="btn btn-p" onclick="selectRole('driver')">DAR TRANSPORTE</button>
+    <button class="btn" style="background:#334155; color:white; margin-top:15px;" onclick="selectRole('client')">BUSCAR VIAJE</button>
 </div>
 
 <div id="loginScreen" class="overlay hidden">
-    <h2 id="loginTitle">Acceso Seguro</h2>
-    <input type="email" id="email" placeholder="Correo" value="wilmer@taxiton.com">
-    <input type="password" id="password" placeholder="Contraseña" value="123456">
-    <button class="btn btn-p" onclick="login()">ENTRAR AL PANEL</button>
+    <h2 id="loginTitle" style="margin-bottom:20px">Acceso</h2>
+    <div id="driverReg" class="hidden">
+        <input type="text" id="dName" placeholder="Tu Nombre">
+        <input type="text" id="dCar" placeholder="Vehículo (Ej: Kia Rio Blanco)">
+    </div>
+    <input type="email" id="email" placeholder="Correo" value="wilmer@test.com">
+    <input type="password" id="password" placeholder="Pass (6 dígitos)" value="123456">
+    <button class="btn btn-p" onclick="handleAuth()">ENTRAR AL PANEL</button>
 </div>
 
 <div id="map"></div>
 
 <div class="panel">
-    <div id="statusHeader" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-        <h3 id="panelTitle">Buscando...</h3>
-        <div id="onlineToggle"></div>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+        <h3 id="panelTitle">Esperando...</h3>
+        <div id="topBtn"></div>
     </div>
-    <div id="mainUI"></div>
+    <div id="mainUI">
+        <p style="text-align:center; color:gray;">Iniciando GPS...</p>
+    </div>
 </div>
 
 <script type="module">
@@ -93,124 +92,113 @@
     const auth = getAuth(app);
     const db = getFirestore(app);
 
-    let map, userLoc, myRole = '', taxiMarkers = {}, activeRideId = null, driverData = null;
+    let map, userLoc, myRole = '', taxiMarkers = {};
 
-    // NAVEGACIÓN
-    window.showScreen = (id) => {
-        document.querySelectorAll('.overlay').forEach(s => s.classList.add('hidden'));
-        document.getElementById(id).classList.remove('hidden');
+    window.selectRole = (r) => {
+        myRole = r;
+        document.getElementById('roleScreen').classList.add('hidden');
+        document.getElementById('loginScreen').classList.remove('hidden');
+        if(r === 'driver') document.getElementById('driverReg').classList.remove('hidden');
     };
 
-    window.setRole = (r) => { myRole = r; showScreen('loginScreen'); };
-
-    // REGISTRO CONDUCTOR
-    window.registerDriver = async () => {
-        const name = document.getElementById('driverName').value;
-        if(!name) return alert("Llena los datos");
-        driverData = { name, car: document.getElementById('carModel').value, plate: document.getElementById('carPlate').value };
-        myRole = 'driver';
-        showScreen('loginScreen');
-    };
-
-    window.login = async () => {
+    window.handleAuth = async () => {
+        const mail = document.getElementById('email').value;
+        const pass = document.getElementById('password').value;
         try {
-            const user = await signInWithEmailAndPassword(auth, document.getElementById("email").value, document.getElementById("password").value);
-            if(myRole === 'driver' && driverData) {
-                await setDoc(doc(db, "taxis", user.user.uid), { ...driverData, status: 'offline', lat: 0, lng: 0 });
-            }
-            showScreen('fake_id_to_hide_all');
-            initSystem();
-        } catch (e) { alert("Error de acceso"); }
+            await signInWithEmailAndPassword(auth, mail, pass);
+            startSystem();
+        } catch (e) {
+            try {
+                await createUserWithEmailAndPassword(auth, mail, pass);
+                startSystem();
+            } catch (err) { alert("Error de acceso"); }
+        }
     };
 
-    function initSystem() {
+    function startSystem() {
+        document.getElementById('loginScreen').classList.add('hidden');
         navigator.geolocation.getCurrentPosition(pos => {
             userLoc = [pos.coords.latitude, pos.coords.longitude];
-            map = L.map("map", { zoomControl: false }).setView(userLoc, 15);
-            L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png").addTo(map);
-            L.circle(userLoc, {radius: 200, color: '#3b82f6', fillOpacity: 0.1}).addTo(map);
-
-            myRole === 'client' ? logicPasajero() : logicConductor();
-        });
-    }
-
-    // LÓGICA PASAJERO
-    function logicPasajero() {
-        document.getElementById('panelTitle').innerText = "Taxis Cercanos";
-        onSnapshot(collection(db, "taxis"), snap => {
-            let list = [];
-            snap.forEach(d => {
-                const t = d.data();
-                const dist = getDist(userLoc, [t.lat, t.lng]);
-                list.push({ id: d.id, ...t, dist });
-            });
-
-            list.sort((a,b) => a.dist - b.dist);
             
-            let html = "";
-            list.forEach(t => {
-                const isOnline = t.status !== 'offline';
-                html += `
-                <div class="taxi-row" ${isOnline ? `onclick="pedirViaje('${t.id}')"` : 'style="opacity:0.5; cursor:default"'}>
-                    <div>
-                        <b>${t.name || 'Conductor'}</b><br>
-                        <small>${t.car || 'Vehículo estándar'}</small>
-                    </div>
-                    <div style="text-align:right">
-                        <span class="status-pill ${isOnline ? 'online' : 'offline'}">${isOnline ? 'Disponible' : 'No disponible'}</span><br>
-                        <small>${t.dist.toFixed(2)} km</small>
-                    </div>
-                </div>`;
-                if(isOnline) updateMarker(t.id, [t.lat, t.lng]);
-            });
-            document.getElementById('mainUI').innerHTML = html;
-        });
+            // INICIAR MAPA
+            map = L.map('map', { zoomControl: false }).setView(userLoc, 15);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+            L.marker(userLoc).addTo(map).bindPopup("Tú");
+
+            // FIX: Forzar que el mapa se vea
+            setInterval(() => { map.invalidateSize(); }, 1000);
+
+            if(myRole === 'driver') initDriver(); else initClient();
+        }, () => alert("Activa el GPS"));
     }
 
-    window.pedirViaje = async (tid) => {
-        activeRideId = auth.currentUser.uid;
-        await setDoc(doc(db, "rides", activeRideId), { taxiId: tid, status: 'pendiente', lat: userLoc[0], lng: userLoc[1] });
-        document.getElementById('mainUI').innerHTML = `<div class="card"><h3>Solicitud enviada...</h3><p>Espera a que el conductor acepte.</p></div>`;
-        onSnapshot(doc(db, "rides", activeRideId), d => {
-            if(d.exists()) document.getElementById('panelTitle').innerText = "Estado: " + d.data().status.toUpperCase();
-        });
-    };
-
-    // LÓGICA CONDUCTOR
-    async function logicConductor() {
+    // --- LÓGICA CONDUCTOR ---
+    async function initDriver() {
         const uid = auth.currentUser.uid;
         document.getElementById('panelTitle').innerText = "Modo Conductor";
-        document.getElementById('onlineToggle').innerHTML = `<button class="status-pill offline" id="togBtn" onclick="toggleOnline()">DESCONECTADO</button>`;
-        
+        const dName = document.getElementById('dName').value || "Chofer";
+        const dCar = document.getElementById('dCar').value || "Taxi";
+
+        await setDoc(doc(db, "taxis", uid), { name: dName, car: dCar, status: 'online', lat: userLoc[0], lng: userLoc[1] });
+
         onSnapshot(query(collection(db, "rides"), where("taxiId", "==", uid)), snap => {
             let html = "";
             snap.forEach(d => {
                 const r = d.data();
                 if(r.status === 'finalizado') return;
-                html += `
-                <div class="card">
-                    <p><b>¡Solicitud de Viaje!</b></p>
-                    <small>Cliente a ${getDist(userLoc, [r.lat, r.lng]).toFixed(2)} km</small>
-                    <button class="btn btn-s" onclick="aceptarViaje('${d.id}')">ACEPTAR</button>
+                html += `<div class="card">
+                    <span class="status-pill ${r.status}">${r.status}</span>
+                    <p style="margin:10px 0;">Cliente solicitando viaje</p>
+                    ${r.status === 'pendiente' ? `<button class="btn btn-s" onclick="updateStatus('${d.id}','aceptado')">ACEPTAR</button>` : ''}
+                    ${r.status === 'aceptado' ? `<button class="btn btn-p" onclick="updateStatus('${d.id}','en_camino')">INICIAR VIAJE</button>` : ''}
+                    ${r.status === 'en_camino' ? `<button class="btn" style="background:red;color:white" onclick="updateStatus('${d.id}','finalizado')">FINALIZAR</button>` : ''}
                 </div>`;
             });
-            if(html === "") html = "<p>Esperando solicitudes...</p>";
-            document.getElementById('mainUI').innerHTML = html;
+            document.getElementById('mainUI').innerHTML = html || "<p>Esperando clientes...</p>";
         });
     }
 
-    window.toggleOnline = async () => {
-        const btn = document.getElementById('togBtn');
-        const isOff = btn.classList.contains('offline');
-        const newStatus = isOff ? 'online' : 'offline';
-        btn.className = `status-pill ${newStatus}`;
-        btn.innerText = newStatus.toUpperCase();
-        await updateDoc(doc(db, "taxis", auth.currentUser.uid), { status: newStatus, lat: userLoc[0], lng: userLoc[1] });
+    // --- LÓGICA PASAJERO ---
+    function initClient() {
+        document.getElementById('panelTitle').innerText = "Taxis Cercanos";
+        onSnapshot(collection(db, "taxis"), snap => {
+            let list = [];
+            snap.forEach(d => {
+                const t = d.data();
+                if(t.status === 'online') {
+                    const dist = getDist(userLoc, [t.lat, t.lng]);
+                    list.push({ id: d.id, ...t, dist });
+                    updateMarker(d.id, [t.lat, t.lng]);
+                }
+            });
+            list.sort((a,b) => a.dist - b.dist);
+            let html = "";
+            list.forEach(t => {
+                html += `<div class="taxi-item" onclick="pedirViaje('${t.id}')">
+                    <div><b>${t.name}</b><br><small>${t.car}</small></div>
+                    <div style="text-align:right"><b>${t.dist.toFixed(2)} km</b><br><span class="status-pill en_camino">PEDIR</span></div>
+                </div>`;
+            });
+            document.getElementById('mainUI').innerHTML = html || "<p>No hay taxis cerca...</p>";
+        });
+    }
+
+    window.pedirViaje = async (tid) => {
+        const rid = auth.currentUser.uid;
+        await setDoc(doc(db, "rides", rid), { taxiId: tid, status: 'pendiente', lat: userLoc[0], lng: userLoc[1] });
+        onSnapshot(doc(db, "rides", rid), d => {
+            const r = d.data();
+            document.getElementById('mainUI').innerHTML = `<div class="card" style="text-align:center">
+                <span class="status-pill ${r.status}">${r.status}</span>
+                <h3>Estado de tu viaje</h3>
+                <p>El conductor está en proceso.</p>
+                ${r.status === 'finalizado' ? `<button class="btn btn-p" onclick="location.reload()">NUEVO VIAJE</button>` : ''}
+            </div>`;
+        });
     };
 
-    window.aceptarViaje = async (rid) => { await updateDoc(doc(db, "rides", rid), { status: 'aceptado' }); alert("Viaje Aceptado"); };
+    window.updateStatus = async (rid, s) => { await updateDoc(doc(db, "rides", rid), { status: s }); };
 
-    // UTILIDADES
     function getDist(a, b) {
         const R = 6371;
         const dLat = (b[0]-a[0]) * Math.PI/180;
