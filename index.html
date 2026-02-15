@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>TAXITON PRO | Conductor</title>
+    <title>TAXITON PRO | Wilmer Session</title>
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -21,41 +21,47 @@
             z-index: 100; box-shadow: 0 -10px 25px rgba(0,0,0,0.1); overflow-y: auto;
         }
 
-        .btn { width: 100%; padding: 15px; border: none; border-radius: 15px; font-weight: 700; cursor: pointer; margin-top: 10px; font-size: 16px; transition: 0.3s; }
+        .btn { width: 100%; padding: 15px; border: none; border-radius: 15px; font-weight: 700; cursor: pointer; margin-top: 10px; font-size: 16px; }
         .btn-p { background: var(--p); color: white; }
         .btn-s { background: var(--s); color: white; }
-        .btn-edit { background: #f1f5f9; color: #475569; font-size: 12px; padding: 8px; width: auto; margin: 0; }
         
         .overlay { position: fixed; inset: 0; background: var(--d); z-index: 9999; display: flex; flex-direction: column; padding: 30px; color: white; overflow-y: auto; }
         .hidden { display: none !important; }
         
-        input, textarea, select { background: #1e293b; border: 1px solid #334155; padding: 14px; border-radius: 12px; color: white; margin-bottom: 12px; width: 100%; font-size: 14px; }
+        input { background: #1e293b; border: 1px solid #334155; padding: 14px; border-radius: 12px; color: white; margin-bottom: 12px; width: 100%; font-size: 14px; }
+        
+        .toggle-link { color: var(--p); text-align: center; margin-top: 15px; cursor: pointer; font-size: 14px; text-decoration: underline; }
         
         .profile-card { background: #fff; border: 1px solid #e2e8f0; padding: 15px; border-radius: 20px; margin-bottom: 15px; display: flex; align-items: center; gap: 15px; }
         .profile-img { width: 65px; height: 65px; border-radius: 50%; object-fit: cover; border: 3px solid var(--p); }
-        
-        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
-        .stat-box { background: #f8fafc; padding: 12px; border-radius: 15px; text-align: center; border: 1px solid #edf2f7; }
-        .stat-box small { color: #64748b; display: block; font-size: 10px; text-transform: uppercase; }
-        .stat-box b { color: var(--d); font-size: 14px; }
+
+        /* Pantalla de Carga Inicial */
+        #splash { background: var(--d); display: flex; align-items: center; justify-content: center; z-index: 10000; position: fixed; inset: 0; }
     </style>
 </head>
 <body>
 
-<div id="setupScreen" class="overlay">
-    <h2 style="text-align:center; margin-bottom:10px;">PERFIL DE CONDUCTOR</h2>
-    <p style="text-align:center; color:#94a3b8; font-size:12px; margin-bottom:20px;">Completa tu información para empezar a recibir viajes.</p>
-    
-    <input type="text" id="cName" placeholder="Nombre completo">
-    <input type="text" id="cCar" placeholder="Vehículo (Ej: Toyota Corolla 2022)">
-    <input type="text" id="cPlate" placeholder="Número de Placa">
-    <input type="text" id="cPhoto" placeholder="URL de tu foto (opcional)">
-    <textarea id="cBio" placeholder="Experiencia o mensaje para pasajeros..."></textarea>
-    
-    <input type="email" id="email" placeholder="Correo electrónico">
-    <input type="password" id="password" placeholder="Contraseña">
-    
-    <button class="btn btn-s" onclick="saveDriver()">GUARDAR Y ACTIVAR GPS</button>
+<div id="splash" class="overlay">
+    <h2 style="color:var(--p)">TAXITON PRO</h2>
+    <p>Verificando cuenta...</p>
+</div>
+
+<div id="registerScreen" class="overlay hidden">
+    <h2 style="text-align:center; margin-bottom:10px;">CREAR PERFIL</h2>
+    <input type="text" id="regName" placeholder="Nombre completo">
+    <input type="text" id="regCar" placeholder="Vehículo (Ej: Kia Rio 2023)">
+    <input type="email" id="regEmail" placeholder="Correo electrónico">
+    <input type="password" id="regPass" placeholder="Contraseña">
+    <button class="btn btn-s" onclick="handleRegister()">REGISTRARME</button>
+    <p class="toggle-link" onclick="switchView('login')">¿Ya tienes cuenta? Inicia sesión</p>
+</div>
+
+<div id="loginScreen" class="overlay hidden">
+    <h2 style="text-align:center; margin-bottom:10px;">INICIAR SESIÓN</h2>
+    <input type="email" id="logEmail" placeholder="Correo electrónico">
+    <input type="password" id="logPass" placeholder="Contraseña">
+    <button class="btn btn-p" onclick="handleLogin()">ENTRAR</button>
+    <p class="toggle-link" onclick="switchView('register')">Crear una cuenta nueva</p>
 </div>
 
 <div id="map"></div>
@@ -64,28 +70,21 @@
     <div class="profile-card">
         <img src="https://via.placeholder.com/150" id="driverImg" class="profile-img">
         <div style="flex:1">
-            <b id="driverTitle" style="font-size: 18px;">Cargando...</b><br>
-            <small id="driverCar" style="color:var(--p); font-weight:600;"></small>
+            <b id="driverTitle">Nombre</b><br>
+            <small id="driverCar" style="color:var(--p)"></small>
         </div>
-        <button class="btn btn-edit" onclick="location.reload()">EDITAR</button>
+        <button class="btn" style="width:auto; padding:8px 12px; font-size:12px;" onclick="handleLogout()">CERRAR SESIÓN</button>
     </div>
-
-    <div class="stats-grid">
-        <div class="stat-box"><small>Estado</small><b style="color:var(--s)">EN LÍNEA</b></div>
-        <div class="stat-box"><small>Viajes Hoy</small><b>0</b></div>
-    </div>
-
     <div id="mainUI">
-        <div style="text-align:center; padding:30px; color:#94a3b8;">
-            <p>Buscando solicitudes de viaje en tu zona...</p>
-            <div style="margin-top:15px;" class="loader"></div>
+        <div style="text-align:center; padding:20px; color:#94a3b8;">
+            <p>Estado: <b>Conectado y Visible</b></p>
         </div>
     </div>
 </div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
     import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
     const firebaseConfig = {
@@ -101,65 +100,85 @@
     const auth = getAuth(app);
     const db = getFirestore(app);
 
+    // CONFIGURAR PERSISTENCIA LOCAL (Para recordar al usuario)
+    setPersistence(auth, browserLocalPersistence);
+
     let map, userLoc;
 
-    window.saveDriver = async () => {
-        const email = document.getElementById('email').value;
-        const pass = document.getElementById('password').value;
-        const name = document.getElementById('cName').value;
-
-        if(!email || !pass || !name) return alert("Nombre, correo y clave son obligatorios.");
-
-        try {
-            const userCred = await createUserWithEmailAndPassword(auth, email, pass);
-            const uid = userCred.user.uid;
-
-            const driverData = {
-                name: name,
-                car: document.getElementById('cCar').value,
-                plate: document.getElementById('cPlate').value,
-                photo: document.getElementById('cPhoto').value || "https://via.placeholder.com/150",
-                bio: document.getElementById('cBio').value,
-                role: 'driver',
-                status: 'online'
-            };
-
-            await setDoc(doc(db, "users", uid), driverData);
-            startDriverApp(driverData);
-        } catch (e) {
-            try {
-                await signInWithEmailAndPassword(auth, email, pass);
-                const d = await getDoc(doc(db, "users", auth.currentUser.uid));
+    // MONITOR DE SESIÓN: Revisa si hay alguien logueado al abrir la app
+    onAuthStateChanged(auth, async (user) => {
+        if (user) {
+            const d = await getDoc(doc(db, "users", user.uid));
+            if (d.exists()) {
                 startDriverApp(d.data());
-            } catch(err) { alert("Error: " + err.message); }
+            } else {
+                switchView('register');
+            }
+        } else {
+            document.getElementById('splash').classList.add('hidden');
+            switchView('login');
+        }
+    });
+
+    window.switchView = (view) => {
+        document.getElementById('splash').classList.add('hidden');
+        if(view === 'login') {
+            document.getElementById('registerScreen').classList.remove('hidden');
+            document.getElementById('loginScreen').classList.remove('hidden'); // Ajuste visual
+            document.getElementById('registerScreen').classList.add('hidden');
+        } else {
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('registerScreen').classList.remove('hidden');
         }
     };
 
+    window.handleRegister = async () => {
+        const email = document.getElementById('regEmail').value;
+        const pass = document.getElementById('regPass').value;
+        const name = document.getElementById('regName').value;
+        try {
+            const userCred = await createUserWithEmailAndPassword(auth, email, pass);
+            const driverData = { name, car: document.getElementById('regCar').value, role: 'driver' };
+            await setDoc(doc(db, "users", userCred.user.uid), driverData);
+            // El onAuthStateChanged se encargará del resto
+        } catch (e) { alert("Error: " + e.message); }
+    };
+
+    window.handleLogin = async () => {
+        const email = document.getElementById('logEmail').value;
+        const pass = document.getElementById('logPass').value;
+        try {
+            await signInWithEmailAndPassword(auth, email, pass);
+        } catch (e) { alert("Credenciales incorrectas"); }
+    };
+
+    window.handleLogout = async () => {
+        await signOut(auth);
+        location.reload();
+    };
+
     function startDriverApp(data) {
-        document.getElementById('setupScreen').classList.add('hidden');
+        document.getElementById('splash').classList.add('hidden');
+        document.getElementById('loginScreen').classList.add('hidden');
+        document.getElementById('registerScreen').classList.add('hidden');
+        
         document.getElementById('driverTitle').innerText = data.name;
         document.getElementById('driverCar').innerText = data.car;
-        document.getElementById('driverImg').src = data.photo;
 
         navigator.geolocation.getCurrentPosition(pos => {
             userLoc = [pos.coords.latitude, pos.coords.longitude];
             initMap(userLoc);
-            // Hacer al conductor visible para los pasajeros
             setDoc(doc(db, "taxis", auth.currentUser.uid), {
-                name: data.name,
-                car: data.car,
-                lat: userLoc[0],
-                lng: userLoc[1],
-                status: 'online'
+                name: data.name, car: data.car, lat: userLoc[0], lng: userLoc[1], status: 'online'
             }, {merge: true});
-        }, () => alert("GPS necesario para trabajar."));
+        });
     }
 
     function initMap(coords) {
         if(!map) {
             map = L.map('map', { zoomControl: false }).setView(coords, 15);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-            L.marker(coords).addTo(map).bindPopup("Estás aquí operando");
+            L.marker(coords).addTo(map);
             setTimeout(() => map.invalidateSize(), 800);
         }
     }
