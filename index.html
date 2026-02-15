@@ -9,97 +9,93 @@
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <style>
-body{margin:0;font-family:Arial;background:#0f172a;color:white}
-h2{margin:10px 0}
-.container{padding:20px}
-input,button{
-width:100%;
-padding:12px;
-margin:8px 0;
-border-radius:8px;
+*{margin:0;padding:0;box-sizing:border-box;font-family:Arial}
+body{background:#0f172a;color:white;overflow:hidden}
+#map{height:100vh;width:100vw}
+
+.login{
+position:absolute;
+top:0;left:0;right:0;bottom:0;
+background:#0f172a;
+display:flex;
+flex-direction:column;
+justify-content:center;
+padding:30px;
+z-index:2000;
+}
+
+input{
+padding:15px;
+margin:10px 0;
 border:none;
-font-size:16px
+border-radius:10px;
+font-size:16px;
 }
+
 button{
-background:#22c55e;
-color:white;
+padding:15px;
+border:none;
+border-radius:15px;
 font-weight:bold;
-cursor:pointer
+font-size:16px;
+cursor:pointer;
 }
-button:hover{opacity:0.8}
-#map{height:70vh}
-.card{
-position:fixed;
+
+.primary{background:#22c55e;color:white;width:100%}
+.logout{
+position:absolute;
+top:15px;
+right:15px;
+background:#ef4444;
+color:white;
+padding:8px 12px;
+border-radius:10px;
+z-index:1000;
+}
+
+.panel{
+position:absolute;
 bottom:0;
 left:0;
 right:0;
 background:white;
 color:black;
-padding:15px;
-border-radius:20px 20px 0 0;
-box-shadow:0 -5px 20px rgba(0,0,0,0.3)
+padding:20px;
+border-radius:25px 25px 0 0;
+box-shadow:0 -10px 30px rgba(0,0,0,0.3);
 }
+
 .hidden{display:none}
-.topbar{
-background:#111827;
-padding:10px;
-text-align:center;
-font-weight:bold
-}
-.logout{
-position:absolute;
-right:10px;
-top:10px;
-background:red;
-padding:5px 10px;
-border-radius:6px;
-font-size:12px
-}
+.status{font-weight:bold;margin-bottom:5px}
+.distance{color:gray;font-size:14px}
 </style>
 </head>
 <body>
 
-<div class="topbar">
-🚖 TAXITON PRO
-<button class="logout" onclick="logout()">Salir</button>
-</div>
-
-<!-- LOGIN -->
-<div id="login" class="container">
-<h2>Iniciar Sesión</h2>
+<div id="loginScreen" class="login">
+<h2>🚖 TAXITON PRO</h2>
 <input type="email" id="email" placeholder="Correo">
 <input type="password" id="password" placeholder="Contraseña">
-<button onclick="login()">Entrar</button>
+<button class="primary" onclick="login()">Entrar</button>
 </div>
 
-<!-- SELECCIÓN ROL -->
-<div id="role" class="container hidden">
-<h2>Selecciona tu rol</h2>
-<button onclick="selectRole('cliente')">Soy Cliente</button>
-<button onclick="selectRole('taxi')">Soy Taxi</button>
-</div>
+<button class="logout hidden" id="logoutBtn" onclick="logout()">Salir</button>
 
-<!-- MAPA -->
-<div id="mapScreen" class="hidden">
 <div id="map"></div>
 
-<div class="card">
-<h3 id="status">Esperando acción...</h3>
-<p id="taxiCount"></p>
-<div id="tripInfo"></div>
-<button onclick="requestTaxi()">Solicitar Taxi</button>
-</div>
+<div class="panel hidden" id="panel">
+<div class="status" id="status">Listo</div>
+<div class="distance" id="distance"></div>
+<button class="primary" onclick="requestTaxi()">Solicitar Taxi</button>
 </div>
 
 <script type="module">
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { 
-getAuth, signInWithEmailAndPassword, signOut 
-} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { 
-getFirestore, doc, setDoc, onSnapshot, collection 
-} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getAuth, signInWithEmailAndPassword, signOut } 
+from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, doc, setDoc, collection, onSnapshot } 
+from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
 apiKey: "AIzaSyCw7WoC5AjqnZ2_vagJs5ZklOZt3b4ZRtg",
@@ -115,20 +111,28 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 let map;
-let userMarker;
-let roleSelected;
 let userLocation;
+let taxiMarkers = {};
+let nearestTaxi = null;
+let isTaxiMode = false;
 
 // LOGIN
-window.login = async () => {
+window.login = async ()=>{
 try{
-const email=document.getElementById("email").value;
-const password=document.getElementById("password").value;
-await signInWithEmailAndPassword(auth,email,password);
-document.getElementById("login").classList.add("hidden");
-document.getElementById("role").classList.remove("hidden");
+await signInWithEmailAndPassword(
+auth,
+document.getElementById("email").value,
+document.getElementById("password").value
+);
+
+document.getElementById("loginScreen").classList.add("hidden");
+document.getElementById("logoutBtn").classList.remove("hidden");
+document.getElementById("panel").classList.remove("hidden");
+
+initMap();
+
 }catch(e){
-alert("Error: "+e.message);
+alert(e.message);
 }
 };
 
@@ -138,76 +142,133 @@ await signOut(auth);
 location.reload();
 };
 
-// SELECCIONAR ROL
-window.selectRole = (role)=>{
-roleSelected=role;
-document.getElementById("role").classList.add("hidden");
-document.getElementById("mapScreen").classList.remove("hidden");
-initMap();
-};
-
-// INICIAR MAPA
+// MAPA
 function initMap(){
 navigator.geolocation.getCurrentPosition(position=>{
-userLocation=[
+
+userLocation = [
 position.coords.latitude,
 position.coords.longitude
 ];
 
-map=L.map('map').setView(userLocation,15);
+map = L.map("map").setView(userLocation,15);
 
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-maxZoom:19
-}).addTo(map);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png")
+.addTo(map);
 
-userMarker=L.marker(userLocation)
+L.marker(userLocation)
 .addTo(map)
 .bindPopup("Tu ubicación")
 .openPopup();
 
-if(roleSelected==="taxi"){
-startTaxiMode();
-}else{
 listenTaxis();
+
+// Detectar si es taxi (puedes cambiar esto manualmente)
+if(confirm("¿Entrar como TAXI?")){
+isTaxiMode = true;
+startTaxiMode();
 }
+
 });
 }
 
-// MODO TAXI
+// MODO TAXI - ENVÍA UBICACIÓN EN TIEMPO REAL
 function startTaxiMode(){
-document.getElementById("status").innerText="Modo TAXI activo 🚖";
 
 navigator.geolocation.watchPosition(async position=>{
-let lat=position.coords.latitude;
-let lng=position.coords.longitude;
+
+const lat = position.coords.latitude;
+const lng = position.coords.longitude;
 
 await setDoc(doc(db,"taxis",auth.currentUser.uid),{
-lat,lng,available:true
+lat: lat,
+lng: lng,
+updated: Date.now()
 });
 
-});
+},
+error=>console.log(error),
+{enableHighAccuracy:true,maximumAge:0}
+);
+
 }
 
-// ESCUCHAR TAXIS
+// ESCUCHAR TAXIS EN TIEMPO REAL
 function listenTaxis(){
+
 onSnapshot(collection(db,"taxis"),snapshot=>{
-let count=0;
-snapshot.forEach(doc=>{
-let data=doc.data();
-L.marker([data.lat,data.lng])
-.addTo(map)
-.bindPopup("Taxi Disponible");
-count++;
+
+nearestTaxi = null;
+let minDistance = 999999;
+
+snapshot.docChanges().forEach(change=>{
+
+const data = change.doc.data();
+const id = change.doc.id;
+const position = [data.lat, data.lng];
+
+if(change.type === "added"){
+taxiMarkers[id] = L.marker(position,{
+icon: L.icon({
+iconUrl:"https://cdn-icons-png.flaticon.com/512/744/744465.png",
+iconSize:[35,35]
+})
+}).addTo(map);
+}
+
+if(change.type === "modified"){
+taxiMarkers[id].setLatLng(position);
+}
+
+if(change.type === "removed"){
+map.removeLayer(taxiMarkers[id]);
+delete taxiMarkers[id];
+}
+
+let dist = getDistance(userLocation, position);
+if(dist < minDistance){
+minDistance = dist;
+nearestTaxi = position;
+}
+
 });
-document.getElementById("taxiCount").innerText=
-"🚕 Taxis disponibles: "+count;
+
+if(nearestTaxi){
+document.getElementById("distance").innerText =
+"Taxi más cercano a " + minDistance.toFixed(2) + " km";
+}else{
+document.getElementById("distance").innerText =
+"No hay taxis disponibles";
+}
+
 });
+
+}
+
+// CALCULAR DISTANCIA
+function getDistance(a,b){
+let R=6371;
+let dLat=(b[0]-a[0])*Math.PI/180;
+let dLon=(b[1]-a[1])*Math.PI/180;
+let lat1=a[0]*Math.PI/180;
+let lat2=b[0]*Math.PI/180;
+
+let x=Math.sin(dLat/2)**2+
+Math.sin(dLon/2)**2*Math.cos(lat1)*Math.cos(lat2);
+
+let d=2*R*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
+return d;
 }
 
 // SOLICITAR TAXI
-window.requestTaxi = ()=>{
-document.getElementById("status").innerText=
-"🔎 Buscando taxi cercano...";
+window.requestTaxi=()=>{
+if(nearestTaxi){
+document.getElementById("status").innerText =
+"🚕 Taxi asignado y en camino...";
+}else{
+document.getElementById("status").innerText =
+"❌ No hay taxis disponibles";
+}
 };
 
 </script>
