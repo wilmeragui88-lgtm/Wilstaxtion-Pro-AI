@@ -37,7 +37,6 @@
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* CORRECCIÓN: BOTÓN SALIR GLOBAL */
         .btn-salir-global {
             position: fixed; top: 20px; right: 20px; z-index: 15000;
             background: rgba(231, 76, 60, 0.9); color: white; border: none;
@@ -70,8 +69,18 @@
             text-transform: uppercase; margin-top: 15px;
         }
 
-        #map, #miniMap { height: 60vh; width: 100%; z-index: 1; filter: hue-rotate(-30deg) brightness(0.8); }
+        #map { height: 60vh; width: 100%; z-index: 1; filter: hue-rotate(-30deg) brightness(0.8); }
         
+        /* Contenedor para rotación GPS */
+        #miniMapContainer {
+            flex: 1; display: none; position: relative; overflow: hidden;
+            background: #000;
+        }
+        #miniMap { 
+            height: 150%; width: 150%; position: absolute; top: -25%; left: -25%;
+            transition: transform 0.5s cubic-bezier(0.2, 0, 0.2, 1);
+        }
+
         .p-panel {
             height: 40vh; background: var(--card-bg); border-radius: 30px 30px 0 0;
             margin-top: -30px; position: relative; z-index: 10; padding: 25px;
@@ -92,6 +101,9 @@
             border-radius: 25px; z-index: 16000; display: none;
             box-shadow: 0 10px 50px rgba(0,0,0,0.5);
         }
+
+        /* Ocultar elementos de Leaflet Routing para limpieza GPS */
+        .leaflet-routing-container { display: none !important; }
     </style>
 </head>
 <body>
@@ -128,9 +140,9 @@
         <div class="status-circle off" id="statusToggle" onclick="toggleWork()">OFF</div>
         <p id="statusLabel" style="color:var(--primary); font-weight:bold;">MODO ESPERA</p>
     </div>
-    <div id="miniMapContainer" style="flex:1; display:none; position:relative;">
+    <div id="miniMapContainer">
         <div id="miniMap"></div>
-        <button id="finishBtn" style="position:absolute; bottom:20px; right:20px; z-index:500; background:var(--danger); color:white; border:none; padding:15px 25px; border-radius:15px; font-weight:bold; display:none;" onclick="finishTrip()">FINALIZAR VIAJE</button>
+        <button id="finishBtn" style="position:absolute; bottom:20px; right:20px; z-index:15000; background:var(--danger); color:white; border:none; padding:15px 25px; border-radius:15px; font-weight:bold; display:none;" onclick="finishTrip()">FINALIZAR VIAJE</button>
     </div>
 </div>
 
@@ -162,6 +174,7 @@
     const db = getFirestore(firebaseApp);
 
     let role = 'pasajero', map, miniMap, userPos, watchId, routingControl, markers = {}, myTaxiMarker;
+    let lastPos = null;
 
     function hablar(m) {
         window.speechSynthesis.cancel();
@@ -169,25 +182,26 @@
         window.speechSynthesis.speak(u);
     }
 
+    // Calcular rumbo para el GPS
+    function getHeading(p1, p2) {
+        const lat1 = p1[0] * Math.PI / 180;
+        const lat2 = p2[0] * Math.PI / 180;
+        const dLon = (p2[1] - p1[1]) * Math.PI / 180;
+        const y = Math.sin(dLon) * Math.cos(lat2);
+        const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+        return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+    }
+
     window.onload = () => { setTimeout(() => { document.getElementById('splash').style.display='none'; }, 2000); };
 
-    // --- CORRECCIÓN FUNCIÓN SALIR ---
     window.quickLogout = async () => {
         if(!confirm("¿Deseas cerrar sesión, Wil?")) return;
-        
-        hablar("Cerrando sesión. Hasta luego.");
-        
         if(watchId) navigator.geolocation.clearWatch(watchId);
-        
         try {
-            if(role === 'taxi' && auth.currentUser) {
-                await deleteDoc(doc(db, "activos", auth.currentUser.uid));
-            }
+            if(role === 'taxi' && auth.currentUser) await deleteDoc(doc(db, "activos", auth.currentUser.uid));
             await signOut(auth);
             location.reload();
-        } catch (e) {
-            location.reload(); // Recarga forzada si falla Firebase
-        }
+        } catch (e) { location.reload(); }
     };
 
     window.setRole = (r) => {
@@ -214,12 +228,11 @@
     onAuthStateChanged(auth, (user) => {
         if (user) {
             document.getElementById('authScreen').style.display = 'none';
-            document.getElementById('mainLogoutBtn').style.display = 'block'; // Mostrar salir
+            document.getElementById('mainLogoutBtn').style.display = 'block';
             if (role === 'pasajero') startPassenger(); else startTaxi();
         }
     });
 
-    // Lógica Pasajero
     function startPassenger() {
         document.getElementById('passengerApp').style.display = 'flex';
         navigator.geolocation.getCurrentPosition(p => {
@@ -227,7 +240,20 @@
             map = L.map('map', {zoomControl: false}).setView(userPos, 15);
             L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
             L.circleMarker(userPos, {radius: 8, color: '#3498db', fillOpacity: 1}).addTo(map);
-            hablar("Buscando conductores cercanos.");
+
+            // FUNCIÓN NUEVA: Escuchar si el taxista acepta
+            onSnapshot(query(collection(db, "viajes"), where("pasajeroId", "==", auth.currentUser.uid)), snap => {
+                snap.forEach(d => {
+                    if(d.data().status === 'aceptado') {
+                        hablar("Wil ya aceptó tu solicitud y está en camino.");
+                        document.getElementById('pPanel').innerHTML = `
+                            <div style="text-align:center; padding:20px;">
+                                <h2 style="color:var(--primary)">¡WIL EN CAMINO!</h2>
+                                <p style="margin-top:10px;">Sigue su ubicación en el mapa.</p>
+                            </div>`;
+                    }
+                });
+            });
 
             onSnapshot(collection(db, "activos"), snap => {
                 const list = document.getElementById('taxiList'); list.innerHTML = "";
@@ -245,19 +271,18 @@
 
     window.requestRide = async (taxiId, taxiName) => {
         hablar(`Llamando a ${taxiName}`);
-        const docRef = await addDoc(collection(db, "viajes"), { 
+        await addDoc(collection(db, "viajes"), { 
             pasajeroId: auth.currentUser.uid, pasajeroNombre: localStorage.getItem('pName'), 
             taxiId, status: 'pendiente', lat: userPos[0], lng: userPos[1], timestamp: serverTimestamp() 
         });
-        document.getElementById('pPanel').innerHTML = "<h2 style='text-align:center;'>Esperando respuesta...</h2>";
+        document.getElementById('pPanel').innerHTML = "<h2 style='text-align:center;'>Esperando a Wil...</h2>";
     };
 
-    // Lógica Taxista
     async function startTaxi() {
         document.getElementById('taxiApp').style.display = 'flex';
-        miniMap = L.map('miniMap', {zoomControl: false}).setView([0,0], 16);
+        miniMap = L.map('miniMap', {zoomControl: false, dragging: false, touchZoom: false}).setView([0,0], 17);
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(miniMap);
-        myTaxiMarker = L.circleMarker([0,0], {radius: 8, color: '#3498db', fillOpacity: 1}).addTo(miniMap);
+        myTaxiMarker = L.circleMarker([0,0], {radius: 10, color: '#2ecc71', fillOpacity: 1}).addTo(miniMap);
         
         onSnapshot(query(collection(db, "viajes"), where("taxiId", "==", auth.currentUser.uid), where("status", "==", "pendiente")), snap => {
             if (!snap.empty) {
@@ -274,13 +299,25 @@
         if (btn.classList.contains('off')) {
             btn.className = "status-circle on"; btn.innerText = "ON";
             document.getElementById('miniMapContainer').style.display = 'block';
-            hablar("Estás en línea.");
+            hablar("Estás en línea. Navegación GPS activa.");
             setTimeout(() => miniMap.invalidateSize(), 300);
             watchId = navigator.geolocation.watchPosition(p => {
                 const c = [p.coords.latitude, p.coords.longitude];
-                window.myLastPos = c; myTaxiMarker.setLatLng(c);
+                
+                // EFECTO GPS DINÁMICO
+                if(lastPos) {
+                    const rumbo = getHeading(lastPos, c);
+                    if(rumbo !== 0) {
+                        document.getElementById('miniMap').style.transform = `rotate(${-rumbo}deg)`;
+                    }
+                }
+                
+                window.myLastPos = c; 
+                myTaxiMarker.setLatLng(c);
+                miniMap.setView(c, 17); // Mantener centrado
+                lastPos = c;
+
                 setDoc(doc(db, "activos", auth.currentUser.uid), { nombre: "Wil", lat: c[0], lng: c[1] });
-                if(!window.activeTripId) miniMap.setView(c, 16);
             }, null, {enableHighAccuracy: true});
         } else {
             btn.className = "status-circle off"; btn.innerText = "OFF";
@@ -292,14 +329,17 @@
     };
 
     window.respondTrip = async (s) => {
+        // Al actualizar esto, el pasajero recibe la notificación automáticamente por el snapshot
         await updateDoc(doc(db, "viajes", window.activeTripId), { status: 'aceptado' });
         document.getElementById('tripAlert').style.display = 'none';
         document.getElementById('finishBtn').style.display = 'block';
-        hablar("Viaje aceptado.");
+        hablar("Viaje aceptado. Wil, el pasajero ha sido notificado.");
+        
+        if(routingControl) miniMap.removeControl(routingControl);
         routingControl = L.Routing.control({
             waypoints: [L.latLng(window.myLastPos[0], window.myLastPos[1]), L.latLng(window.pLoc[0], window.pLoc[1])],
             createMarker: () => null,
-            lineOptions: { styles: [{ color: '#2ecc71', weight: 6 }] }
+            lineOptions: { styles: [{ color: '#2ecc71', weight: 8 }] }
         }).addTo(miniMap);
     };
 
