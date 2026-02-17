@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Wilstaxtion Pro - GPS Master</title>
+    <title>Wilstaxtion Pro - Original Stable</title>
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
@@ -15,127 +15,100 @@
             --card-bg: #111827; --danger: #e74c3c; --text: #f8fafc;
         }
 
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; -webkit-tap-highlight-color: transparent; }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
         body { background: var(--dark); height: 100vh; overflow: hidden; color: var(--text); position: fixed; width: 100%; }
 
         /* Splash */
-        #splash {
-            position: fixed; inset: 0; background: var(--dark); z-index: 20000;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-        }
-        .loader { width: 60px; height: 60px; border: 5px solid #1e293b; border-top: 5px solid var(--primary); border-radius: 50%; animation: spin 1s linear infinite; }
+        #splash { position: fixed; inset: 0; background: var(--dark); z-index: 20000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .loader { width: 50px; height: 50px; border: 5px solid #1e293b; border-top: 5px solid var(--primary); border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        .btn-salir-global { position: fixed; top: 20px; left: 20px; z-index: 15000; background: rgba(231, 76, 60, 0.8); color: white; border: none; padding: 10px 15px; border-radius: 10px; font-size: 12px; }
-
+        /* Auth */
         .full-screen { position: fixed; inset: 0; background: var(--dark); z-index: 9000; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 30px; }
-        .role-btn { flex: 1; padding: 18px; border: 2px solid #1e293b; border-radius: 15px; cursor: pointer; text-align: center; font-weight: bold; color: white; background: var(--card-bg); }
-        .role-btn.active { border-color: var(--primary); background: rgba(46, 204, 113, 0.1); color: var(--primary); }
-
-        input { width: 100%; max-width: 340px; padding: 18px; margin: 8px 0; border-radius: 15px; border: 1px solid #1e293b; background: var(--card-bg); color: white; outline: none; }
-        .btn-entrar { width: 100%; max-width: 340px; padding: 18px; background: var(--primary); color: var(--dark); border: none; border-radius: 15px; font-weight: 900; text-transform: uppercase; margin-top: 15px; }
+        .role-btn { flex: 1; padding: 15px; border: 2px solid #1e293b; border-radius: 12px; cursor: pointer; text-align: center; color: white; background: var(--card-bg); font-weight: bold; }
+        .role-btn.active { border-color: var(--primary); color: var(--primary); }
+        input { width: 100%; max-width: 300px; padding: 15px; margin: 5px 0; border-radius: 12px; border: 1px solid #1e293b; background: var(--card-bg); color: white; }
+        .btn-entrar { width: 100%; max-width: 300px; padding: 15px; background: var(--primary); border: none; border-radius: 12px; font-weight: bold; margin-top: 10px; }
 
         .app-panel { display: none; flex-direction: column; height: 100vh; width: 100%; }
 
-        /* CONTENEDOR DE MAPA DINÁMICO */
-        #miniMapContainer { flex: 1; position: relative; overflow: hidden; background: #000; perspective: 1000px; }
-        #miniMap { 
-            height: 300%; width: 300%; position: absolute; top: -100%; left: -100%;
-            transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-            transform-origin: center center;
-        }
+        /* MAPA */
+        #mapBox { flex: 1; position: relative; background: #000; overflow: hidden; }
+        #map { height: 100%; width: 100%; }
+        
+        /* Contenedor 3D Conductor */
+        .mode-3d { perspective: 1000px; }
+        .mode-3d #map { height: 300%; width: 300%; top: -100%; left: -100%; transform: rotateX(45deg); }
 
-        /* Modos de Vista */
-        .view-3d { transform: rotateX(45deg); }
-        .view-2d { transform: rotateX(0deg) !important; height: 100% !important; width: 100% !important; top:0 !important; left:0 !important; }
+        /* Acordeón de Mapas */
+        .map-selector { position: absolute; top: 15px; right: 15px; z-index: 10000; }
+        .acc-btn { width: 45px; height: 45px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #333; box-shadow: 0 4px 10px rgba(0,0,0,0.3); cursor: pointer; }
+        .acc-content { display: none; background: white; border-radius: 12px; margin-top: 10px; padding: 5px; flex-direction: column; gap: 5px; }
+        .acc-content.show { display: flex; }
+        .opt-mini { border: none; padding: 10px; border-radius: 8px; background: #f0f0f0; font-size: 12px; font-weight: bold; cursor: pointer; }
 
-        /* MENÚ ACORDEÓN */
-        .menu-acordeon { position: absolute; top: 20px; right: 20px; z-index: 10000; width: 50px; transition: 0.3s; overflow: hidden; background: rgba(17, 24, 39, 0.95); border-radius: 15px; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        .menu-acordeon.open { width: 200px; }
-        .menu-header { height: 50px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--primary); font-size: 20px; }
-        .menu-content { display: none; padding: 15px; flex-direction: column; gap: 8px; }
-        .menu-acordeon.open .menu-content { display: flex; }
-        .btn-map-opt { background: #1f2937; border: none; padding: 12px; border-radius: 10px; color: white; text-align: left; font-size: 13px; display: flex; align-items: center; gap: 10px; cursor: pointer; }
-        .btn-map-opt:active { background: var(--secondary); }
-
-        #iaBanner { position: absolute; bottom: 20px; left: 20px; right: 20px; background: rgba(17, 24, 39, 0.95); padding: 15px; border-radius: 15px; border-left: 5px solid var(--primary); font-size: 13px; z-index: 11000; display: none; backdrop-filter: blur(10px); color: white; }
-
-        .status-circle { width: 100px; height: 100px; border-radius: 50%; border: 6px solid #1e293b; font-size: 18px; font-weight: 900; margin: 15px auto; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.3s; }
-        .status-circle.on { background: var(--primary); color: var(--dark); box-shadow: 0 0 30px var(--primary); }
-        .status-circle.off { background: #1e293b; color: #4b5563; }
-
-        #finishBtn { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 15000; background: var(--danger); color: white; border: none; padding: 18px 45px; border-radius: 50px; font-weight: bold; display: none; box-shadow: 0 10px 20px rgba(0,0,0,0.4); }
-        #tripAlert { position: fixed; bottom: 30px; left: 20px; right: 20px; background: white; color: black; padding: 30px; border-radius: 30px; z-index: 16000; display: none; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+        #iaBanner { position: fixed; bottom: 20px; left: 20px; right: 20px; background: rgba(17, 24, 39, 0.9); padding: 15px; border-radius: 15px; border-left: 5px solid var(--primary); z-index: 11000; display: none; color: white; }
+        
+        .status-circle { width: 90px; height: 90px; border-radius: 50%; border: 5px solid #1e293b; margin: 15px auto; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; }
+        .status-circle.on { background: var(--primary); color: #000; box-shadow: 0 0 20px var(--primary); }
+        
+        #tripAlert { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; color: #000; padding: 30px; border-radius: 20px; z-index: 15000; display: none; text-align: center; width: 80%; }
+        #finishBtn { position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%); z-index: 14000; background: var(--danger); color: white; border: none; padding: 15px 30px; border-radius: 30px; font-weight: bold; display: none; }
         
         .leaflet-routing-container { display: none !important; }
     </style>
 </head>
 <body>
 
-<audio id="alertSound" src="https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3" preload="auto"></audio>
-<audio id="arrivalSound" src="https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3" preload="auto"></audio>
-
-<div id="splash">
-    <div class="loader"></div>
-    <h2 style="margin-top:20px; letter-spacing:3px; font-weight: 900;">WILSTAXTION PRO</h2>
-</div>
-
-<button id="mainLogoutBtn" class="btn-salir-global" style="display:none;" onclick="quickLogout()">SALIR</button>
+<div id="splash"><div class="loader"></div></div>
 
 <div id="authScreen" class="full-screen">
-    <h1 style="color: var(--primary); font-weight: 900; margin-bottom: 20px;">WILSTAXTION</h1>
-    <div style="display:flex; gap:10px; width:100%; max-width:340px; margin-bottom:20px;">
-        <div class="role-btn active" id="btnRP" onclick="selectRole('pasajero')">PASAJERO</div>
-        <div class="role-btn" id="btnRT" onclick="selectRole('taxi')">TAXISTA</div>
+    <h2 style="color:var(--primary); margin-bottom:20px;">WILSTAXTION</h2>
+    <div style="display:flex; gap:10px; width:100%; max-width:300px; margin-bottom:15px;">
+        <div class="role-btn active" id="rP" onclick="sel('pasajero')">PASAJERO</div>
+        <div class="role-btn" id="rT" onclick="sel('taxi')">TAXISTA</div>
     </div>
-    <div id="loginFields" style="width: 100%; display: flex; flex-direction: column; align-items: center;">
-        <input type="text" id="p-name" placeholder="Tu nombre">
+    <div id="inputs">
+        <input type="text" id="u-name" placeholder="Tu Nombre">
     </div>
-    <button class="btn-entrar" onclick="handleAuth()">INGRESAR</button>
+    <button class="btn-entrar" onclick="ingresar()">ENTRAR</button>
 </div>
 
-<div id="iaBanner"><i class="fas fa-robot"></i> <span id="iaText">Cargando...</span></div>
+<div id="iaBanner"><i class="fas fa-robot"></i> <span id="iaText">...</span></div>
 
-<div id="taxiApp" class="app-panel">
-    <div style="height:35vh; display:flex; flex-direction:column; justify-content:center; align-items:center; background: #070b14; z-index: 20;">
-        <div class="status-circle off" id="statusToggle" onclick="toggleWork()">OFF</div>
-        <p id="statusLabel" style="color:var(--primary); font-weight:bold;">SISTEMA APAGADO</p>
+<div id="mainApp" class="app-panel">
+    <div id="topTaxi" style="height:30vh; display:none; flex-direction:column; justify-content:center; background:#070b14;">
+        <div class="status-circle" id="tgl" onclick="toggleW()">OFF</div>
+        <p id="stL" style="text-align:center; font-size:12px; color:var(--primary);">DESCONECTADO</p>
     </div>
-    
-    <div id="miniMapContainer">
-        <div id="miniMap" class="view-3d"></div>
+
+    <div id="mapBox">
+        <div id="map"></div>
         
-        <div class="menu-acordeon" id="mapMenu">
-            <div class="menu-header" onclick="toggleAccordion()">
-                <i class="fas fa-cog"></i>
-            </div>
-            <div class="menu-content">
-                <p style="font-size: 10px; color: #666;">ESTILO</p>
-                <button class="btn-map-opt" onclick="changeMap('night')"><i class="fas fa-moon"></i> Noche Dark</button>
-                <button class="btn-map-opt" onclick="changeMap('day')"><i class="fas fa-sun"></i> Día Calle</button>
-                <button class="btn-map-opt" onclick="changeMap('sat')"><i class="fas fa-globe"></i> Satelital</button>
-                <p style="font-size: 10px; color: #666; margin-top:10px;">VISTA</p>
-                <button class="btn-map-opt" onclick="changeView('3d')"><i class="fas fa-cube"></i> Modo GPS 3D</button>
-                <button class="btn-map-opt" onclick="changeView('2d')"><i class="fas fa-map"></i> Mapa Normal 2D</button>
+        <div class="map-selector">
+            <div class="acc-btn" onclick="document.getElementById('acc').classList.toggle('show')"><i class="fas fa-layer-group"></i></div>
+            <div class="acc-content" id="acc">
+                <button class="opt-mini" onclick="setM('night')">NOCHE</button>
+                <button class="opt-mini" onclick="setM('day')">CALLE</button>
+                <button class="opt-mini" onclick="setM('sat')">SATELITAL</button>
+                <button class="opt-mini" id="btn3D" onclick="toggle3D()">MODO 2D</button>
             </div>
         </div>
     </div>
-    
-    <button id="finishBtn" onclick="finishTrip()">FINALIZAR RUTA</button>
-</div>
 
-<div id="passengerApp" class="app-panel">
-    <div id="map" style="flex:1;"></div>
-    <div style="padding:20px; background:var(--card-bg); height:30vh; border-top-left-radius:30px; border-top-right-radius:30px;">
+    <div id="bottomPass" style="height:40vh; background:var(--card-bg); padding:20px; display:none;">
+        <h4 style="color:var(--primary); margin-bottom:10px;">Conductores Disponibles</h4>
         <div id="taxiList"></div>
     </div>
 </div>
 
 <div id="tripAlert">
-    <h2 style="color:#111">¡NUEVO PEDIDO!</h2>
-    <p id="clientName" style="margin:15px 0; font-size:20px; font-weight:bold; color:var(--secondary);"></p>
-    <button onclick="respondTrip()" style="width:100%; padding:15px; background:var(--primary); color:white; border:none; border-radius:15px; font-weight:bold;">ACEPTAR</button>
+    <h3>¡NUEVO VIAJE!</h3>
+    <p id="pName" style="font-size:20px; margin:15px 0; font-weight:bold;"></p>
+    <button onclick="aceptarV()" style="width:100%; padding:15px; background:var(--primary); border:none; border-radius:10px; font-weight:bold;">ACEPTAR AHORA</button>
 </div>
+
+<button id="finishBtn" onclick="finalizarV()">FINALIZAR SERVICIO</button>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
@@ -154,153 +127,150 @@
         appId: "1:1091576841981:web:1dd7bbefb518580fb76094"
     };
 
-    const firebaseApp = initializeApp(firebaseConfig);
-    const auth = getAuth(firebaseApp);
-    const db = getFirestore(firebaseApp);
+    const fb = initializeApp(firebaseConfig);
+    const auth = getAuth(fb);
+    const db = getFirestore(fb);
 
-    let miniMap, userPos, watchId, lastPos = null, activeTripId = null, routingControl = null;
-    let currentRole = 'pasajero', mapLayer;
-
+    let map, mapL, userPos, lastP = null, role = 'pasajero', activeV = null, routeC = null;
     const tiles = {
         night: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
         day: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
         sat: 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}'
     };
 
-    function hablarIA(texto) {
-        window.speechSynthesis.cancel();
-        const msg = new SpeechSynthesisUtterance(texto);
-        msg.lang = 'es-ES';
-        window.speechSynthesis.speak(msg);
-        document.getElementById('iaText').innerText = texto;
-        document.getElementById('iaBanner').style.display = 'block';
-        setTimeout(() => document.getElementById('iaBanner').style.display = 'none', 6000);
-    }
-
-    window.toggleAccordion = () => document.getElementById('mapMenu').classList.toggle('open');
-
-    // --- CORRECCIÓN DE VISUALIZACIÓN DE MAPAS ---
-    window.changeMap = (style) => {
-        if(miniMap && mapLayer) {
-            miniMap.removeLayer(mapLayer);
-            mapLayer = L.tileLayer(tiles[style], { maxZoom: 20 }).addTo(miniMap);
-            miniMap.invalidateSize(); // Refresco forzado
-        }
-        toggleAccordion();
+    window.sel = (r) => {
+        role = r;
+        document.getElementById('rP').classList.toggle('active', r==='pasajero');
+        document.getElementById('rT').classList.toggle('active', r==='taxi');
+        document.getElementById('inputs').innerHTML = r === 'pasajero' ? '<input type="text" id="u-name" placeholder="Tu Nombre">' : '<input type="email" id="u-mail" placeholder="Email"><input type="password" id="u-pass" placeholder="Clave">';
     };
 
-    window.changeView = (view) => {
-        const m = document.getElementById('miniMap');
-        if(view === '3d') {
-            m.className = 'view-3d';
-        } else {
-            m.className = 'view-2d';
-        }
-        setTimeout(() => miniMap.invalidateSize(), 500);
-        toggleAccordion();
-    };
-
-    function sonar(t) {
-        document.getElementById(t === 'alerta' ? 'alertSound' : 'arrivalSound').play().catch(()=>{});
-    }
-
-    window.onload = () => { setTimeout(() => document.getElementById('splash').style.display='none', 2000); };
-
-    window.selectRole = (r) => {
-        currentRole = r;
-        document.getElementById('btnRP').classList.toggle('active', r === 'pasajero');
-        document.getElementById('btnRT').classList.toggle('active', r === 'taxi');
-    };
-
-    window.handleAuth = async () => {
-        localStorage.setItem('wil_role', currentRole);
-        if(currentRole === 'pasajero') {
-            const n = document.getElementById('p-name').value;
-            localStorage.setItem('wil_pName', n);
+    window.ingresar = async () => {
+        if(role === 'pasajero') {
+            localStorage.setItem('wil_n', document.getElementById('u-name').value);
             await signInAnonymously(auth);
         } else {
-            const e = document.getElementById('t-email').value, p = document.getElementById('t-pass').value;
-            try { await signInWithEmailAndPassword(auth, e, p); } catch { alert("Error"); }
+            await signInWithEmailAndPassword(auth, document.getElementById('u-mail').value, document.getElementById('u-pass').value);
         }
+        localStorage.setItem('wil_r', role);
     };
 
-    onAuthStateChanged(auth, (user) => {
-        if (user) {
-            document.getElementById('authScreen').style.display = 'none';
-            document.getElementById('mainLogoutBtn').style.display = 'block';
-            if (localStorage.getItem('wil_role') === 'taxi') startTaxi();
+    onAuthStateChanged(auth, u => {
+        if(u) {
+            document.getElementById('authScreen').style.display='none';
+            document.getElementById('mainApp').style.display='flex';
+            init();
         }
     });
 
-    function startTaxi() {
-        document.getElementById('taxiApp').style.display = 'flex';
-        setTimeout(() => {
-            miniMap = L.map('miniMap', {zoomControl: false, attributionControl: false}).setView([0,0], 18);
-            mapLayer = L.tileLayer(tiles.night).addTo(miniMap);
-            window.myMarker = L.marker([0,0], {icon: L.divIcon({html: '<i class="fas fa-location-arrow" style="color:var(--primary); font-size:40px; transform:rotate(-45deg);"></i>', iconSize:[40,40], className:''})}).addTo(miniMap);
-            miniMap.invalidateSize();
-        }, 500);
+    function hablar(t) {
+        const m = new SpeechSynthesisUtterance(t); m.lang='es-ES';
+        window.speechSynthesis.speak(m);
+        document.getElementById('iaText').innerText = t;
+        document.getElementById('iaBanner').style.display='block';
+        setTimeout(()=> document.getElementById('iaBanner').style.display='none', 5000);
+    }
 
-        onSnapshot(query(collection(db, "viajes"), where("taxiId", "==", auth.currentUser.uid)), snap => {
-            snap.docChanges().forEach(change => {
-                const data = change.doc.data();
-                if(change.type === "added" && data.status === 'pendiente') {
-                    activeTripId = change.doc.id;
-                    document.getElementById('clientName').innerText = data.pasajeroNombre;
-                    document.getElementById('tripAlert').style.display = 'block';
-                    sonar('alerta'); hablarIA(`Wil, tienes una solicitud de ${data.pasajeroNombre}.`);
+    function init() {
+        const r = localStorage.getItem('wil_r');
+        navigator.geolocation.getCurrentPosition(p => {
+            userPos = [p.coords.latitude, p.coords.longitude];
+            map = L.map('map', {zoomControl: false}).setView(userPos, 16);
+            mapL = L.tileLayer(tiles.night).addTo(map);
+            
+            if(r === 'pasajero') {
+                document.getElementById('bottomPass').style.display='block';
+                L.marker(userPos).addTo(map);
+                onSnapshot(collection(db, "activos"), s => {
+                    const l = document.getElementById('taxiList'); l.innerHTML = '';
+                    s.forEach(d => { if(d.data().online) {
+                        const div = document.createElement('div');
+                        div.style = "background:#1f2937; padding:12px; border-radius:10px; margin-bottom:8px; display:flex; justify-content:space-between;";
+                        div.innerHTML = `<span>${d.data().nombre}</span><button onclick="pedir('${d.id}')" style="color:var(--primary); background:none; border:none; font-weight:bold;">PEDIR</button>`;
+                        l.appendChild(div);
+                    }});
+                });
+            } else {
+                document.getElementById('topTaxi').style.display='flex';
+                document.getElementById('mapBox').classList.add('mode-3d');
+                window.mkr = L.marker(userPos, {icon: L.divIcon({html:'<i class="fas fa-location-arrow" style="color:var(--primary); font-size:30px; transform:rotate(-45deg);"></i>', className:''})}).addTo(map);
+                escucharViajes();
+            }
+        });
+    }
+
+    window.setM = (s) => {
+        if(mapL) map.removeLayer(mapL);
+        mapL = L.tileLayer(tiles[s]).addTo(map);
+        document.getElementById('acc').classList.remove('show');
+    };
+
+    window.toggle3D = () => {
+        const box = document.getElementById('mapBox');
+        const is3D = box.classList.toggle('mode-3d');
+        document.getElementById('btn3D').innerText = is3D ? "MODO 2D" : "MODO 3D GPS";
+        setTimeout(() => map.invalidateSize(), 400);
+    };
+
+    window.toggleW = () => {
+        const btn = document.getElementById('tgl');
+        const on = btn.classList.toggle('on');
+        btn.innerText = on ? "ON" : "OFF";
+        document.getElementById('stL').innerText = on ? "EN LÍNEA" : "DESCONECTADO";
+        if(on) {
+            hablar("Sistema Wilstaxtion activado.");
+            navigator.geolocation.watchPosition(p => {
+                const c = [p.coords.latitude, p.coords.longitude];
+                if(lastP) {
+                    const b = (Math.atan2(Math.sin((c[1]-lastP[1])*Math.PI/180)*Math.cos(c[0]*Math.PI/180), Math.cos(lastP[0]*Math.PI/180)*Math.sin(c[0]*Math.PI/180)-Math.sin(lastP[0]*Math.PI/180)*Math.cos(c[0]*Math.PI/180)*Math.cos((c[1]-lastP[1])*Math.PI/180))*180/Math.PI+360)%360;
+                    if(document.getElementById('mapBox').classList.contains('mode-3d')) {
+                        document.getElementById('map').style.transform = `rotateX(45deg) rotateZ(${-b}deg)`;
+                    }
+                }
+                window.mkr.setLatLng(c); map.setView(c);
+                lastP = c;
+                setDoc(doc(db, "activos", auth.currentUser.uid), {nombre: "Wil", online: true, lat: c[0], lng: c[1]});
+            }, null, {enableHighAccuracy:true});
+        }
+    };
+
+    window.pedir = async (id) => {
+        hablar("Llamando a Wil.");
+        await addDoc(collection(db, "viajes"), {taxiId: id, pasajeroId: auth.currentUser.uid, pasajeroNombre: localStorage.getItem('wil_n'), status:'pendiente', lat: userPos[0], lng: userPos[1]});
+    };
+
+    function escucharViajes() {
+        onSnapshot(query(collection(db, "viajes"), where("taxiId", "==", auth.currentUser.uid)), s => {
+            s.docChanges().forEach(c => {
+                if(c.type === "added" && c.doc.data().status === 'pendiente') {
+                    activeV = c.doc.id;
+                    document.getElementById('pName').innerText = c.doc.data().pasajeroNombre;
+                    document.getElementById('tripAlert').style.display='block';
+                    hablar("Wil, tienes un nuevo servicio.");
                     
-                    if(routingControl) miniMap.removeControl(routingControl);
-                    routingControl = L.Routing.control({
-                        waypoints: [L.latLng(lastPos[0], lastPos[1]), L.latLng(data.lat, data.lng)],
-                        lineOptions: { styles: [{ color: '#3498db', weight: 8, opacity: 0.8 }] },
+                    // RUTA AL PASAJERO
+                    if(routeC) map.removeControl(routeC);
+                    routeC = L.Routing.control({
+                        waypoints: [L.latLng(lastP[0], lastP[1]), L.latLng(c.doc.data().lat, c.doc.data().lng)],
+                        lineOptions: { styles: [{color: '#3498db', weight: 7}] },
                         createMarker: () => null
-                    }).addTo(miniMap);
+                    }).addTo(map);
                 }
             });
         });
     }
 
-    window.toggleWork = () => {
-        const isOff = document.getElementById('statusToggle').classList.contains('off');
-        document.getElementById('statusToggle').className = isOff ? "status-circle on" : "status-circle off";
-        document.getElementById('statusToggle').innerText = isOff ? "ON" : "OFF";
-
-        if(isOff) {
-            hablarIA("Wilstaxtion activo.");
-            watchId = navigator.geolocation.watchPosition(p => {
-                const c = [p.coords.latitude, p.coords.longitude];
-                if(lastPos) {
-                    const brng = (Math.atan2(Math.sin((c[1]-lastPos[1])*Math.PI/180)*Math.cos(c[0]*Math.PI/180), Math.cos(lastPos[0]*Math.PI/180)*Math.sin(c[0]*Math.PI/180)-Math.sin(lastPos[0]*Math.PI/180)*Math.cos(c[0]*Math.PI/180)*Math.cos((c[1]-lastPos[1])*Math.PI/180))*180/Math.PI+360)%360;
-                    if(document.getElementById('miniMap').className === 'view-3d') {
-                        document.getElementById('miniMap').style.transform = `rotateX(45deg) rotateZ(${-brng}deg)`;
-                    }
-                }
-                window.myMarker.setLatLng(c); miniMap.setView(c, miniMap.getZoom());
-                lastPos = c;
-                setDoc(doc(db, "activos", auth.currentUser.uid), { nombre: "Wil", lat: c[0], lng: c[1], online: true });
-            }, null, {enableHighAccuracy: true});
-        } else {
-            updateDoc(doc(db, "activos", auth.currentUser.uid), { online: false });
-        }
+    window.aceptarV = async () => {
+        await updateDoc(doc(db, "viajes", activeV), {status:'aceptado'});
+        document.getElementById('tripAlert').style.display='none';
+        document.getElementById('finishBtn').style.display='block';
+        hablar("Viaje aceptado. En camino.");
     };
 
-    window.respondTrip = async () => {
-        await updateDoc(doc(db, "viajes", activeTripId), { status: 'aceptado' });
-        document.getElementById('tripAlert').style.display = 'none';
-        document.getElementById('finishBtn').style.display = 'block';
-        hablarIA("Ruta iniciada.");
+    window.finalizarV = async () => {
+        await deleteDoc(doc(db, "viajes", activeV));
+        location.reload();
     };
-
-    window.finishTrip = async () => {
-        if(routingControl) miniMap.removeControl(routingControl);
-        document.getElementById('finishBtn').style.display = 'none';
-        hablarIA("Buen trabajo, Wil.");
-        await deleteDoc(doc(db, "viajes", activeTripId));
-        setTimeout(()=> location.reload(), 2000);
-    };
-
-    window.quickLogout = () => { localStorage.clear(); location.reload(); };
 </script>
 </body>
 </html>
