@@ -23,6 +23,15 @@
         .loader { width: 60px; height: 60px; border: 5px solid #1e293b; border-top: 5px solid var(--primary); border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
+        /* Toast System */
+        #toast-container { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 25000; display: flex; flex-direction: column; gap: 10px; pointer-events: none; width: 90%; max-width: 350px; }
+        .toast { background: rgba(17, 24, 39, 0.95); color: white; padding: 15px; border-radius: 12px; border-left: 5px solid var(--primary); box-shadow: 0 10px 15px rgba(0,0,0,0.3); display: flex; align-items: center; gap: 12px; animation: slideIn 0.3s ease-out; }
+        .toast.error { border-left-color: var(--danger); }
+        .toast.info { border-left-color: var(--secondary); }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+        .toast-fade-out { animation: fadeOut 0.5s ease-in forwards; }
+        @keyframes fadeOut { to { opacity: 0; transform: translateY(-20px); } }
+
         .btn-salir-global { position: fixed; top: 20px; right: 20px; z-index: 15000; background: rgba(231, 76, 60, 0.9); color: white; border: none; padding: 12px 20px; border-radius: 12px; font-weight: bold; }
 
         /* Auth */
@@ -54,7 +63,7 @@
         .radar { width: 80px; height: 80px; border: 3px solid var(--primary); border-radius: 50%; animation: pulse 1.5s infinite; }
         @keyframes pulse { 0% { transform: scale(0.5); opacity: 1; } 100% { transform: scale(1.5); opacity: 0; } }
 
-        /* Acordeón Perfil Conductor */
+        /* Perfil */
         .accordion { width: 100%; max-width: 340px; background: var(--card-bg); border-radius: 15px; margin-bottom: 15px; overflow: hidden; border: 1px solid #1e293b; }
         .acc-header { padding: 12px; background: #1f2937; cursor: pointer; display: flex; justify-content: space-between; font-weight: bold; color: var(--primary); font-size: 14px; }
         .acc-content { padding: 0; height: 0; transition: 0.3s ease-out; overflow: hidden; }
@@ -72,6 +81,7 @@
 </head>
 <body>
 
+<div id="toast-container"></div>
 <div id="splash"><div class="loader"></div><h2 style="margin-top:20px; font-weight: 900;">WILSTAXTION PRO AI</h2></div>
 
 <button id="mainLogoutBtn" class="btn-salir-global" style="display:none;" onclick="quickLogout()">SALIR</button>
@@ -171,6 +181,20 @@
         day: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
     };
 
+    // --- SISTEMA DE NOTIFICACIONES ---
+    window.showToast = (mensaje, tipo = 'success') => {
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        toast.className = `toast ${tipo}`;
+        const icon = tipo === 'error' ? 'fa-exclamation-triangle' : (tipo === 'info' ? 'fa-info-circle' : 'fa-check-circle');
+        toast.innerHTML = `<i class="fas ${icon}"></i> <span>${mensaje}</span>`;
+        container.appendChild(toast);
+        setTimeout(() => {
+            toast.classList.add('toast-fade-out');
+            setTimeout(() => toast.remove(), 500);
+        }, 3500);
+    };
+
     function hablarIA(texto) {
         window.speechSynthesis.cancel();
         const msg = new SpeechSynthesisUtterance(texto);
@@ -196,6 +220,7 @@
             placa: document.getElementById('d-plate-input').value || "Sin Placa"
         };
         localStorage.setItem('driverProfile', JSON.stringify(p));
+        showToast("Perfil de vehículo guardado", "info");
         hablarIA("Datos de tu vehículo actualizados satisfactoriamente.");
         window.toggleAcc();
     };
@@ -209,6 +234,7 @@
             if(currentTLayer) targetMap.removeLayer(currentTLayer);
             currentTLayer = L.tileLayer(mapStyles[style]).addTo(targetMap);
         }
+        showToast(`Mapa cambiado a modo ${style === 'day' ? 'día' : 'noche'}`, "info");
     };
 
     window.onload = () => { setTimeout(() => document.getElementById('splash').style.display='none', 2000); };
@@ -222,13 +248,17 @@
 
     window.handleAuth = async () => {
         if(role === 'pasajero') {
-            localStorage.setItem('pName', document.getElementById('p-name').value);
+            const name = document.getElementById('p-name').value;
+            if(!name) return showToast("Por favor, ingresa tu nombre", "error");
+            localStorage.setItem('pName', name);
             await signInAnonymously(auth);
         } else {
             try { 
-                const cred = await signInWithEmailAndPassword(auth, document.getElementById('t-email').value, document.getElementById('t-pass').value);
-                loggedUserName = document.getElementById('t-email').value.split('@')[0].toUpperCase();
-            } catch { alert("Error de acceso"); }
+                const email = document.getElementById('t-email').value;
+                const pass = document.getElementById('t-pass').value;
+                await signInWithEmailAndPassword(auth, email, pass);
+                loggedUserName = email.split('@')[0].toUpperCase();
+            } catch { showToast("Error de acceso: Credenciales inválidas", "error"); }
         }
     };
 
@@ -236,6 +266,7 @@
         if (user) {
             document.getElementById('authScreen').style.display = 'none';
             document.getElementById('mainLogoutBtn').style.display = 'block';
+            showToast("Sesión iniciada correctamente");
             if (role === 'pasajero') startPassenger(); else startTaxi();
         }
     });
@@ -243,7 +274,7 @@
     // --- LÓGICA PASAJERO ---
     function startPassenger() {
         const pName = localStorage.getItem('pName') || "Usuario";
-        hablarIA(`¡Bienvenido a Wilstaxtion, ${pName}! Te encuentras en tu sistema de bienvenida al transporte premium. Estamos listos para llevarte a tu destino. Selecciona un conductor de la lista para comenzar.`);
+        hablarIA(`¡Bienvenido a Wilstaxtion, ${pName}!`);
         
         document.getElementById('passengerApp').style.display = 'flex';
         navigator.geolocation.watchPosition(p => {
@@ -253,7 +284,7 @@
                 currentPLayer = L.tileLayer(mapStyles.night).addTo(map);
                 L.circleMarker(userPos, {radius: 9, color: '#3498db', fillOpacity: 0.8, fillColor: '#fff'}).addTo(map);
             }
-        });
+        }, null, {enableHighAccuracy: true});
 
         onSnapshot(query(collection(db, "viajes"), where("pasajeroId", "==", auth.currentUser.uid)), snap => {
             if(snap.empty) { document.getElementById('connectingOverlay').style.display = 'none'; tripNotified = false; return; }
@@ -262,10 +293,15 @@
                 if(d.status === 'aceptado' && !tripNotified) {
                     tripNotified = true;
                     document.getElementById('connectingOverlay').style.display = 'none';
-                    document.getElementById('pStatusTitle').innerHTML = `<b style="color:var(--primary)">${d.driverName} VA EN CAMINO</b>`;
-                    hablarIA(`¡Confirmado! Tu conductor ${d.driverName} aceptó la solicitud. Ya inició el recorrido y va en camino. Por favor, mantente atento.`);
+                    document.getElementById('pStatusTitle').innerHTML = `<b style="color:var(--primary)">${d.driverName} EN CAMINO</b>`;
+                    showToast(`Conductor ${d.driverName} aceptó tu viaje`);
+                    hablarIA(`¡Confirmado! Tu conductor ${d.driverName} va en camino.`);
                 }
-                if(d.status === 'finalizado') { hablarIA("Viaje terminado satisfactoriamente. Gracias por confiar en nosotros."); deleteDoc(doc(db, "viajes", v.id)); }
+                if(d.status === 'finalizado') { 
+                    showToast("Viaje finalizado. ¡Gracias!", "info");
+                    hablarIA("Viaje terminado. Gracias por confiar en nosotros."); 
+                    deleteDoc(doc(db, "viajes", v.id)); 
+                }
             });
         });
 
@@ -286,7 +322,8 @@
 
     window.requestRide = async (taxiId, dName) => {
         document.getElementById('connectingOverlay').style.display = 'flex';
-        hablarIA(`Conectando con la unidad de ${dName}. Por favor espera un momento.`);
+        showToast(`Solicitando viaje a ${dName}...`, "info");
+        hablarIA(`Conectando con la unidad de ${dName}.`);
         await addDoc(collection(db, "viajes"), { 
             pasajeroId: auth.currentUser.uid, pasajeroNombre: localStorage.getItem('pName'), 
             taxiId, driverName: dName, status: 'pendiente', lat: userPos[0], lng: userPos[1], timestamp: serverTimestamp() 
@@ -295,8 +332,7 @@
 
     // --- LÓGICA CONDUCTOR ---
     function startTaxi() {
-        hablarIA(`Hola ${loggedUserName}, bienvenido a tu central de transporte y solicitudes en el sistema virtual. El radar está listo para recibir nuevos servicios.`);
-        
+        hablarIA(`Hola ${loggedUserName}, bienvenido.`);
         document.getElementById('taxiApp').style.display = 'flex';
         miniMap = L.map('miniMap', {zoomControl: false}).setView([0,0], 19);
         currentTLayer = L.tileLayer(mapStyles.night).addTo(miniMap);
@@ -308,7 +344,8 @@
                     window.activeTripId = v.id; window.pLoc = [v.data().lat, v.data().lng];
                     document.getElementById('clientName').innerText = v.data().pasajeroNombre;
                     document.getElementById('tripAlert').style.display = 'block';
-                    hablarIA(`Alerta. ${loggedUserName}, tienes una nueva solicitud de servicio de ${v.data().pasajeroNombre}.`);
+                    showToast("¡NUEVA SOLICITUD DE VIAJE!", "info");
+                    hablarIA(`Alerta. Tienes una nueva solicitud de ${v.data().pasajeroNombre}.`);
                 }
             });
         });
@@ -320,7 +357,8 @@
         document.getElementById('statusToggle').classList.toggle('on', !isOff);
         
         if(!isOff) {
-            hablarIA(`Sistema de radar activado. Estás en línea, ${loggedUserName}.`);
+            showToast("Radar Activado - En línea");
+            hablarIA(`Sistema de radar activado. Estás en línea.`);
             navigator.geolocation.watchPosition(p => {
                 const c = [p.coords.latitude, p.coords.longitude];
                 if(lastPos) {
@@ -332,6 +370,7 @@
                 setDoc(doc(db, "activos", auth.currentUser.uid), { nombre: loggedUserName, ...pInfo, lat: c[0], lng: c[1], online: true, busy: inTrip });
             }, null, {enableHighAccuracy: true});
         } else { 
+            showToast("Desconectado", "error");
             hablarIA("Sistema desconectado.");
             updateDoc(doc(db, "activos", auth.currentUser.uid), { online: false }); 
         }
@@ -344,7 +383,8 @@
             await updateDoc(doc(db, "activos", auth.currentUser.uid), { busy: true });
             document.getElementById('tripAlert').style.display = 'none';
             document.getElementById('driverUI').style.display = 'flex';
-            hablarIA("Servicio aceptado. Generando ruta óptima en el mapa virtual.");
+            showToast("Viaje Aceptado. Iniciando navegación.");
+            hablarIA("Servicio aceptado.");
 
             if(routingControl) miniMap.removeControl(routingControl);
             routingControl = L.Routing.control({
@@ -355,14 +395,15 @@
         } else {
             await updateDoc(doc(db, "viajes", window.activeTripId), { status: 'rechazado' });
             document.getElementById('tripAlert').style.display = 'none';
-            hablarIA("Solicitud rechazada.");
+            showToast("Viaje rechazado", "error");
         }
     };
 
     window.finishTrip = async () => {
-        hablarIA("Servicio completado. Has llegado a tu destino.");
+        showToast("Viaje completado satisfactoriamente");
+        hablarIA("Servicio completado.");
         await updateDoc(doc(db, "viajes", window.activeTripId), { status: 'finalizado' });
-        setTimeout(() => location.reload(), 3000);
+        setTimeout(() => location.reload(), 2000);
     };
 
     window.quickLogout = () => { auth.signOut(); location.reload(); };
