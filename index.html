@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Wilstaxtion Pro AI - Premium Edition</title>
+    <title>Wilstaxtion Pro AI - Map Color Edition</title>
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
@@ -38,6 +38,10 @@
         #miniMapContainer { height: 45vh; position: relative; overflow: hidden; background: #000; perspective: 1000px; }
         #map, #miniMap { height: 100%; width: 100%; }
         #miniMap { height: 250%; width: 250%; position: absolute; top: -75%; left: -75%; transform: rotateX(45deg); transition: transform 0.5s; }
+
+        /* Selector de Color de Mapa */
+        .map-style-ctrl { position: absolute; top: 10px; right: 10px; z-index: 1000; display: flex; flex-direction: column; gap: 8px; }
+        .btn-style { width: 40px; height: 40px; border-radius: 10px; border: 2px solid white; background: white; cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 10px rgba(0,0,0,0.3); }
 
         /* Notificación Estilo Llamada */
         #p-toast { 
@@ -96,7 +100,14 @@
 </div>
 
 <div id="passengerApp" style="display:none; flex-direction:column; min-height:100vh;">
-    <div id="mapContainer"><div id="map"></div></div>
+    <div id="mapContainer">
+        <div id="map"></div>
+        <div class="map-style-ctrl">
+            <button class="btn-style" onclick="changeMapStyle('dark', 'map')" title="Oscuro"><i class="fas fa-moon"></i></button>
+            <button class="btn-style" onclick="changeMapStyle('light', 'map')" title="Calle"><i class="fas fa-road"></i></button>
+            <button class="btn-style" onclick="changeMapStyle('sat', 'map')" title="Satélite"><i class="fas fa-globe"></i></button>
+        </div>
+    </div>
     <div class="p-panel">
         <h3 style="color:var(--primary); margin-bottom:15px;"><i class="fas fa-taxi"></i> Unidades Cercanas</h3>
         <div id="taxiList"></div>
@@ -118,6 +129,11 @@
     </div>
     <div id="miniMapContainer">
         <div id="miniMap"></div>
+        <div class="map-style-ctrl">
+            <button class="btn-style" onclick="changeMapStyle('dark', 'miniMap')"><i class="fas fa-moon"></i></button>
+            <button class="btn-style" onclick="changeMapStyle('light', 'miniMap')"><i class="fas fa-road"></i></button>
+            <button class="btn-style" onclick="changeMapStyle('sat', 'miniMap')"><i class="fas fa-globe"></i></button>
+        </div>
         <div class="driver-controls" id="driverUI" style="display:none;">
             <button class="btn-action" style="background:var(--primary);" onclick="finishTrip()">TERMINAR SERVICIO</button>
         </div>
@@ -157,6 +173,13 @@
 
     let role = 'pasajero', map, miniMap, userPos, lastPos = null, myMarker, routingControl, geoWatch;
     let loggedUserName = "Conductor", inTrip = false, callInterval;
+    let currentTileLayerP, currentTileLayerD;
+
+    const mapTiles = {
+        dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+        light: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        sat: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+    };
 
     function hablarIA(texto) {
         window.speechSynthesis.cancel();
@@ -181,6 +204,18 @@
         localStorage.setItem('driverProfile', JSON.stringify(profile));
         hablarIA("Perfil guardado permanentemente en el sistema.");
         document.getElementById('accContent').classList.remove('open');
+    };
+
+    window.changeMapStyle = (style, target) => {
+        const m = target === 'map' ? map : miniMap;
+        if(!m) return;
+        if(target === 'map') {
+            if(currentTileLayerP) m.removeLayer(currentTileLayerP);
+            currentTileLayerP = L.tileLayer(mapTiles[style]).addTo(m);
+        } else {
+            if(currentTileLayerD) m.removeLayer(currentTileLayerD);
+            currentTileLayerD = L.tileLayer(mapTiles[style]).addTo(m);
+        }
     };
 
     window.handleAuth = async () => {
@@ -212,7 +247,7 @@
         document.getElementById('taxiApp').style.display = 'flex';
         loadSavedProfile();
         miniMap = L.map('miniMap', {zoomControl: false}).setView([0,0], 19);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(miniMap);
+        currentTileLayerD = L.tileLayer(mapTiles.dark).addTo(miniMap);
         myMarker = L.marker([0,0], {icon: L.divIcon({html: '<i class="fas fa-location-arrow" style="color:var(--primary); font-size:40px; transform:rotate(-45deg);"></i>'})}).addTo(miniMap);
 
         onSnapshot(query(collection(db, "viajes"), where("taxiId", "==", auth.currentUser.uid)), snap => {
@@ -222,8 +257,6 @@
                     window.pLoc = [v.data().lat, v.data().lng];
                     document.getElementById('clientName').innerText = v.data().pasajeroNombre;
                     document.getElementById('tripAlert').style.display = 'flex';
-                    
-                    // REPETIR VOZ ESTILO LLAMADA
                     hablarIA("Atención, tienes una solicitud de viaje. Atención.");
                     callInterval = setInterval(() => hablarIA("Solicitud de viaje entrante."), 4000);
                 }
@@ -281,7 +314,7 @@
         navigator.geolocation.getCurrentPosition(p => {
             userPos = [p.coords.latitude, p.coords.longitude];
             map = L.map('map', {zoomControl: false}).setView(userPos, 17);
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
+            currentTileLayerP = L.tileLayer(mapTiles.dark).addTo(map);
             L.circleMarker(userPos, {radius: 8, color: '#3498db', fillOpacity: 0.8}).addTo(map);
         });
 
@@ -301,7 +334,6 @@
     }
 
     window.requestRide = async (taxiId, dName) => {
-        // NOTIFICACIÓN PASAJERO
         const toast = document.getElementById('p-toast');
         toast.style.display = 'flex';
         toast.innerText = "SOLICITANDO SERVICIO A " + dName + "...";
