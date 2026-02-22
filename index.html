@@ -68,6 +68,12 @@
 
         #tripAlert { position: fixed; bottom: 30px; left: 20px; right: 20px; background: white; color: black; padding: 25px; border-radius: 25px; z-index: 16000; display: none; text-align: center; box-shadow: 0 10px 50px rgba(0,0,0,0.5); }
         .leaflet-routing-container { display: none !important; }
+
+        /* Estilos Extra para Fotos */
+        .img-preview { width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 2px solid var(--primary); margin: 10px auto; display: block; }
+        .taxi-card { background:#1f2937; padding:15px; border-radius:20px; margin-bottom:12px; display:flex; align-items:center; gap:15px; border-left: 5px solid var(--primary); }
+        .taxi-card.busy { border-left-color: var(--danger); }
+        .taxi-img { width: 55px; height: 55px; border-radius: 50%; object-fit: cover; background: #000; }
     </style>
 </head>
 <body>
@@ -108,13 +114,20 @@
 </div>
 
 <div id="taxiApp" style="display:none; flex-direction:column; height:100vh;">
-    <div style="height:40vh; display:flex; flex-direction:column; justify-content:center; align-items:center; padding-top: 20px;">
+    <div style="height:45vh; display:flex; flex-direction:column; justify-content:center; align-items:center; padding-top: 20px;">
         <div class="accordion">
             <div class="acc-header" onclick="toggleAcc()">CONFIGURAR MI PERFIL <i class="fas fa-chevron-down"></i></div>
             <div class="acc-content" id="accContent">
+                <div style="text-align: center;">
+                    <label for="d-photo-file" style="cursor:pointer; font-size: 12px; color: var(--secondary);">
+                        <i class="fas fa-camera"></i> SUBIR FOTO DE PERFIL
+                    </label>
+                    <input type="file" id="d-photo-file" accept="image/*" style="display:none;" onchange="previewImage(this)">
+                    <img id="profile-preview" src="" class="img-preview" style="display:none;">
+                </div>
                 <input type="text" id="d-car-input" style="width:90%; margin:5px;" placeholder="Vehículo (Ej: Kia Picanto)">
                 <input type="text" id="d-plate-input" style="width:90%; margin:5px;" placeholder="Placa (Ej: P-445)">
-                <button onclick="saveProfile()" style="width:90%; padding:10px; background:var(--secondary); border:none; border-radius:10px; color:white; margin:5px;">GUARDAR</button>
+                <button onclick="saveProfile()" style="width:90%; padding:10px; background:var(--secondary); border:none; border-radius:10px; color:white; margin:5px;">ACTUALIZAR PERFIL</button>
             </div>
         </div>
         <div class="status-circle off" id="statusToggle" onclick="toggleWork()">OFF</div>
@@ -148,6 +161,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getAuth, signInAnonymously, onAuthStateChanged, signOut, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
     import { getFirestore, doc, setDoc, deleteDoc, collection, onSnapshot, query, where, addDoc, serverTimestamp, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyCw7WoC5AjqnZ2_vagJs5ZklOZt3b4ZRtg",
@@ -161,6 +175,7 @@
     const firebaseApp = initializeApp(firebaseConfig);
     const auth = getAuth(firebaseApp);
     const db = getFirestore(firebaseApp);
+    const storage = getStorage(firebaseApp);
 
     let role = 'pasajero', map, miniMap, userPos, lastPos = null, myMarker, routingControl;
     let loggedUserName = "Conductor", inTrip = false, tripNotified = false;
@@ -190,14 +205,52 @@
 
     window.toggleAcc = () => document.getElementById('accContent').classList.toggle('open');
 
-    window.saveProfile = () => {
-        const p = { 
-            auto: document.getElementById('d-car-input').value || "Vehículo estándar",
-            placa: document.getElementById('d-plate-input').value || "Sin Placa"
-        };
-        localStorage.setItem('driverProfile', JSON.stringify(p));
-        hablarIA("Datos de tu vehículo actualizados satisfactoriamente.");
-        window.toggleAcc();
+    // Previsualización de imagen
+    window.previewImage = (input) => {
+        if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = document.getElementById('profile-preview');
+                img.src = e.target.result;
+                img.style.display = 'block';
+            };
+            reader.readAsDataURL(input.files[0]);
+        }
+    };
+
+    window.saveProfile = async () => {
+        const file = document.getElementById('d-photo-file').files[0];
+        const car = document.getElementById('d-car-input').value || "Vehículo estándar";
+        const plate = document.getElementById('d-plate-input').value || "Sin Placa";
+        let photoURL = localStorage.getItem('lastPhotoURL') || "";
+
+        try {
+            hablarIA("Actualizando tu perfil en la red...");
+            
+            if (file) {
+                const storageRef = ref(storage, `perfiles/${auth.currentUser.uid}`);
+                const snapshot = await uploadBytes(storageRef, file);
+                photoURL = await getDownloadURL(snapshot.ref);
+                localStorage.setItem('lastPhotoURL', photoURL);
+            }
+
+            const profile = { 
+                auto: car,
+                placa: plate,
+                foto: photoURL || `https://ui-avatars.com/api/?name=${loggedUserName}`
+            };
+
+            localStorage.setItem('driverProfile', JSON.stringify(profile));
+            
+            if (auth.currentUser) {
+                await updateDoc(doc(db, "activos", auth.currentUser.uid), profile);
+            }
+
+            hablarIA("Perfil actualizado con éxito. Los pasajeros ya pueden ver tus datos.");
+            window.toggleAcc();
+        } catch (e) {
+            alert("Error al guardar: " + e.message);
+        }
     };
 
     window.changeMapStyle = (style, target) => {
@@ -243,7 +296,7 @@
     // --- LÓGICA PASAJERO ---
     function startPassenger() {
         const pName = localStorage.getItem('pName') || "Usuario";
-        hablarIA(`¡Bienvenido a Wilstaxtion, ${pName}! Te encuentras en tu sistema de bienvenida al transporte premium. Estamos listos para llevarte a tu destino. Selecciona un conductor de la lista para comenzar.`);
+        hablarIA(`¡Bienvenido a Wilstaxtion, ${pName}!`);
         
         document.getElementById('passengerApp').style.display = 'flex';
         navigator.geolocation.watchPosition(p => {
@@ -263,21 +316,29 @@
                     tripNotified = true;
                     document.getElementById('connectingOverlay').style.display = 'none';
                     document.getElementById('pStatusTitle').innerHTML = `<b style="color:var(--primary)">${d.driverName} VA EN CAMINO</b>`;
-                    hablarIA(`¡Confirmado! Tu conductor ${d.driverName} aceptó la solicitud. Ya inició el recorrido y va en camino. Por favor, mantente atento.`);
+                    hablarIA(`¡Confirmado! Tu conductor ${d.driverName} va en camino.`);
                 }
-                if(d.status === 'finalizado') { hablarIA("Viaje terminado satisfactoriamente. Gracias por confiar en nosotros."); deleteDoc(doc(db, "viajes", v.id)); }
+                if(d.status === 'finalizado') { hablarIA("Viaje terminado."); deleteDoc(doc(db, "viajes", v.id)); }
             });
         });
 
+        // LISTA DE TAXIS MEJORADA CON FOTO Y AUTO
         onSnapshot(collection(db, "activos"), snap => {
             const list = document.getElementById('taxiList'); list.innerHTML = "";
             snap.forEach(d => {
                 const t = d.data();
                 if(t.online) {
                     const card = document.createElement('div');
-                    card.style = "background:#1f2937; padding:18px; border-radius:20px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;";
-                    card.innerHTML = `<div><b>${t.nombre}</b><br><small>${t.busy ? 'OCUPADO' : 'DISPONIBLE'}</small></div>` +
-                                     (!t.busy ? `<button onclick="requestRide('${d.id}', '${t.nombre}')" style="background:var(--primary); padding:10px 20px; border-radius:10px; border:none; font-weight:bold;">SOLICITAR</button>` : '');
+                    card.className = `taxi-card ${t.busy ? 'busy' : ''}`;
+                    card.innerHTML = `
+                        <img src="${t.foto || 'https://via.placeholder.com/55'}" class="taxi-img">
+                        <div style="flex:1">
+                            <b style="font-size:16px">${t.nombre}</b><br>
+                            <small style="color:#94a3b8">${t.auto || 'Taxi'} • ${t.placa || 'S/N'}</small><br>
+                            <small style="color:${t.busy ? 'var(--danger)' : 'var(--primary)'}">${t.busy ? 'OCUPADO' : 'DISPONIBLE'}</small>
+                        </div>
+                        ${!t.busy ? `<button onclick="requestRide('${d.id}', '${t.nombre}')" style="background:var(--primary); padding:10px 15px; border-radius:12px; border:none; font-weight:bold; color:var(--dark)">PEDIR</button>` : ''}
+                    `;
                     list.appendChild(card);
                 }
             });
@@ -286,7 +347,7 @@
 
     window.requestRide = async (taxiId, dName) => {
         document.getElementById('connectingOverlay').style.display = 'flex';
-        hablarIA(`Conectando con la unidad de ${dName}. Por favor espera un momento.`);
+        hablarIA(`Solicitando viaje a ${dName}.`);
         await addDoc(collection(db, "viajes"), { 
             pasajeroId: auth.currentUser.uid, pasajeroNombre: localStorage.getItem('pName'), 
             taxiId, driverName: dName, status: 'pendiente', lat: userPos[0], lng: userPos[1], timestamp: serverTimestamp() 
@@ -295,9 +356,20 @@
 
     // --- LÓGICA CONDUCTOR ---
     function startTaxi() {
-        hablarIA(`Hola ${loggedUserName}, bienvenido a tu central de transporte y solicitudes en el sistema virtual. El radar está listo para recibir nuevos servicios.`);
-        
+        hablarIA(`Hola ${loggedUserName}, radar listo.`);
         document.getElementById('taxiApp').style.display = 'flex';
+        
+        // Cargar datos previos si existen
+        const saved = JSON.parse(localStorage.getItem('driverProfile'));
+        if(saved) {
+            document.getElementById('d-car-input').value = saved.auto;
+            document.getElementById('d-plate-input').value = saved.placa;
+            if(saved.foto) {
+                document.getElementById('profile-preview').src = saved.foto;
+                document.getElementById('profile-preview').style.display = 'block';
+            }
+        }
+
         miniMap = L.map('miniMap', {zoomControl: false}).setView([0,0], 19);
         currentTLayer = L.tileLayer(mapStyles.night).addTo(miniMap);
         myMarker = L.marker([0,0], {icon: L.divIcon({html: '<i class="fas fa-location-arrow" style="color:var(--primary); font-size:40px; transform:rotate(-45deg);"></i>'})}).addTo(miniMap);
@@ -308,7 +380,7 @@
                     window.activeTripId = v.id; window.pLoc = [v.data().lat, v.data().lng];
                     document.getElementById('clientName').innerText = v.data().pasajeroNombre;
                     document.getElementById('tripAlert').style.display = 'block';
-                    hablarIA(`Alerta. ${loggedUserName}, tienes una nueva solicitud de servicio de ${v.data().pasajeroNombre}.`);
+                    hablarIA(`Nueva solicitud de ${v.data().pasajeroNombre}.`);
                 }
             });
         });
@@ -320,7 +392,7 @@
         document.getElementById('statusToggle').classList.toggle('on', !isOff);
         
         if(!isOff) {
-            hablarIA(`Sistema de radar activado. Estás en línea, ${loggedUserName}.`);
+            hablarIA("Estás en línea.");
             navigator.geolocation.watchPosition(p => {
                 const c = [p.coords.latitude, p.coords.longitude];
                 if(lastPos) {
@@ -328,11 +400,11 @@
                     document.getElementById('miniMap').style.transform = `rotateX(45deg) rotateZ(${-h}deg)`;
                 }
                 myMarker.setLatLng(c); miniMap.setView(c, 19); lastPos = c;
-                const pInfo = JSON.parse(localStorage.getItem('driverProfile')) || {auto:"Taxi", placa:"N/A"};
+                const pInfo = JSON.parse(localStorage.getItem('driverProfile')) || {auto:"Taxi", placa:"N/A", foto:""};
                 setDoc(doc(db, "activos", auth.currentUser.uid), { nombre: loggedUserName, ...pInfo, lat: c[0], lng: c[1], online: true, busy: inTrip });
             }, null, {enableHighAccuracy: true});
         } else { 
-            hablarIA("Sistema desconectado.");
+            hablarIA("Desconectado.");
             updateDoc(doc(db, "activos", auth.currentUser.uid), { online: false }); 
         }
     };
@@ -344,7 +416,7 @@
             await updateDoc(doc(db, "activos", auth.currentUser.uid), { busy: true });
             document.getElementById('tripAlert').style.display = 'none';
             document.getElementById('driverUI').style.display = 'flex';
-            hablarIA("Servicio aceptado. Generando ruta óptima en el mapa virtual.");
+            hablarIA("Viaje aceptado.");
 
             if(routingControl) miniMap.removeControl(routingControl);
             routingControl = L.Routing.control({
@@ -355,14 +427,13 @@
         } else {
             await updateDoc(doc(db, "viajes", window.activeTripId), { status: 'rechazado' });
             document.getElementById('tripAlert').style.display = 'none';
-            hablarIA("Solicitud rechazada.");
         }
     };
 
     window.finishTrip = async () => {
-        hablarIA("Servicio completado. Has llegado a tu destino.");
+        hablarIA("Servicio terminado.");
         await updateDoc(doc(db, "viajes", window.activeTripId), { status: 'finalizado' });
-        setTimeout(() => location.reload(), 3000);
+        setTimeout(() => location.reload(), 2000);
     };
 
     window.quickLogout = () => { auth.signOut(); location.reload(); };
