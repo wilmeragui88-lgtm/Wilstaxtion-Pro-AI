@@ -117,11 +117,11 @@
 <div id="taxiApp">
     <div class="taxi-config-area">
         <div class="accordion">
-            <div class="acc-header" onclick="toggleAcc()">PERFIL PERMANENTE DEL VEHÍCULO <i class="fas fa-chevron-down"></i></div>
+            <div class="acc-header" onclick="toggleAcc()">PERFIL VEHÍCULO <i class="fas fa-chevron-down"></i></div>
             <div class="acc-content" id="accContent">
-                <input type="text" id="d-car-input" placeholder="Modelo del Vehículo">
-                <input type="text" id="d-plate-input" placeholder="Número de Placa">
-                <button onclick="saveProfile()" style="width:100%; padding:15px; background:var(--secondary); border:none; border-radius:12px; color:white; font-weight:bold; margin-top:10px;">GUARDAR DATOS</button>
+                <input type="text" id="d-car-input" placeholder="Modelo">
+                <input type="text" id="d-plate-input" placeholder="Placa">
+                <button onclick="saveProfile()" style="width:100%; padding:15px; background:var(--secondary); border:none; border-radius:12px; color:white; font-weight:bold; margin-top:10px;">GUARDAR</button>
             </div>
         </div>
         <div class="status-circle off" id="statusToggle" onclick="toggleWork()">OFF</div>
@@ -185,6 +185,7 @@
         window.speechSynthesis.cancel();
         const msg = new SpeechSynthesisUtterance(texto);
         msg.lang = 'es-ES';
+        msg.rate = 1;
         window.speechSynthesis.speak(msg);
     }
 
@@ -210,16 +211,16 @@
 
     window.saveProfile = () => {
         const profile = { auto: document.getElementById('d-car-input').value, placa: document.getElementById('d-plate-input').value };
-        if(!profile.auto || !profile.placa) return alert("Por favor completa los datos.");
+        if(!profile.auto || !profile.placa) return alert("Completa los datos.");
         localStorage.setItem('driverProfile', JSON.stringify(profile));
-        hablarIA("Perfil guardado permanentemente.");
+        hablarIA("Datos guardados.");
         document.getElementById('accContent').classList.remove('open');
     };
 
     window.handleAuth = async () => {
         if(role === 'pasajero') {
             const name = document.getElementById('p-name').value;
-            if(!name) return alert("Ingresa tu nombre");
+            if(!name) return alert("Nombre requerido");
             localStorage.setItem('pName', name);
             await signInAnonymously(auth);
         } else {
@@ -228,7 +229,7 @@
                 const pass = document.getElementById('t-pass').value;
                 await signInWithEmailAndPassword(auth, email, pass);
                 loggedUserName = email.split('@')[0].toUpperCase();
-            } catch { alert("Credenciales incorrectas"); }
+            } catch { alert("Error de acceso"); }
         }
     };
 
@@ -240,6 +241,7 @@
         }
     });
 
+    // --- TAXI ---
     function startTaxi() {
         document.getElementById('taxiApp').style.display = 'flex';
         loadSavedProfile();
@@ -254,8 +256,10 @@
                     window.pLoc = [v.data().lat, v.data().lng];
                     document.getElementById('clientName').innerText = v.data().pasajeroNombre;
                     document.getElementById('tripAlert').style.display = 'flex';
-                    hablarIA("Atención, tienes una solicitud de viaje.");
-                    callInterval = setInterval(() => hablarIA("Solicitud de viaje entrante."), 4000);
+                    
+                    // NOTIFICACIÓN CONDUCTOR ESTILO LLAMADA
+                    hablarIA("Solicitud de viaje entrante. Solicitud de viaje entrante.");
+                    callInterval = setInterval(() => hablarIA("Atención, tienes un nuevo servicio."), 4000);
                 }
             });
         });
@@ -269,7 +273,7 @@
         document.getElementById('statusLabel').innerText = isOff ? "MODO: FUERA DE SERVICIO" : "MODO: EN LÍNEA";
 
         if(!isOff) {
-            hablarIA("Sistema activo.");
+            hablarIA("Sistema activo. En espera.");
             geoWatch = navigator.geolocation.watchPosition(p => {
                 const c = [p.coords.latitude, p.coords.longitude];
                 myMarker.setLatLng(c); miniMap.setView(c, 19); lastPos = c;
@@ -290,7 +294,9 @@
             await updateDoc(doc(db, "activos", auth.currentUser.uid), { busy: true });
             document.getElementById('tripAlert').style.display = 'none';
             document.getElementById('driverUI').style.display = 'flex';
-            hablarIA("Aceptado. Trazando ruta al pasajero.");
+            
+            // NOTIFICACIÓN CONDUCTOR
+            hablarIA("Aceptado. Iniciando recorrido. Trazando ruta al pasajero.");
 
             if(routingControl) miniMap.removeControl(routingControl);
             routingControl = L.Routing.control({
@@ -305,6 +311,7 @@
         }
     };
 
+    // --- PASAJERO ---
     function startPassenger() {
         document.getElementById('passengerApp').style.display = 'flex';
         navigator.geolocation.getCurrentPosition(p => {
@@ -332,9 +339,11 @@
     window.requestRide = async (taxiId, dName) => {
         const toast = document.getElementById('p-toast');
         toast.style.display = 'flex';
-        toast.innerText = "SOLICITANDO SERVICIO A " + dName + "...";
+        toast.innerText = "SOLICITANDO A " + dName + "...";
         toast.style.background = "var(--secondary)";
-        hablarIA("Solicitando servicio. Por favor espera.");
+        
+        // NOTIFICACIÓN PASAJERO AL SOLICITAR
+        hablarIA("Solicitando servicio a " + dName + ". Por favor, mantente a la espera.");
         
         await addDoc(collection(db, "viajes"), { 
             pasajeroId: auth.currentUser.uid, pasajeroNombre: localStorage.getItem('pName'), 
@@ -347,8 +356,10 @@
                 if(v.data().status === 'aceptado') {
                     toast.innerText = "¡VIAJE ACEPTADO! EL CONDUCTOR VA EN CAMINO";
                     toast.style.background = "var(--primary)";
-                    hablarIA("Tu viaje ha sido aceptado.");
-                    setTimeout(() => toast.style.display = 'none', 6000);
+                    
+                    // NOTIFICACIÓN PASAJERO CUANDO ACEPTAN
+                    hablarIA("¡Excelente noticia! Tu conductor ha aceptado el viaje y ya va en camino hacia tu ubicación. Por favor, espera un momento.");
+                    setTimeout(() => toast.style.display = 'none', 8000);
                 }
             });
         });
@@ -358,7 +369,7 @@
         inTrip = false; 
         await updateDoc(doc(db, "viajes", window.activeTripId), { status: 'finalizado' });
         await updateDoc(doc(db, "activos", auth.currentUser.uid), { busy: false }); 
-        hablarIA("Servicio concluido. Gracias por usar Wilstaxtion.");
+        hablarIA("Servicio concluido. Ya estás disponible para nuevos viajes.");
         location.reload();
     };
 
@@ -367,7 +378,7 @@
         role = r;
         document.getElementById('btnRP').classList.toggle('active', r === 'pasajero');
         document.getElementById('btnRT').classList.toggle('active', r === 'taxi');
-        document.getElementById('loginFields').innerHTML = r === 'pasajero' ? `<input type="text" id="p-name" placeholder="Tu Nombre">` : `<input type="email" id="t-email" placeholder="Email"><input type="password" id="t-pass" placeholder="Contraseña">`;
+        document.getElementById('loginFields').innerHTML = r === 'pasajero' ? `<input type="text" id="p-name" placeholder="Nombre">` : `<input type="email" id="t-email" placeholder="Email"><input type="password" id="t-pass" placeholder="Password">`;
     };
     window.quickLogout = () => { auth.signOut(); location.reload(); };
     setTimeout(() => document.getElementById('splash').style.display='none', 2000);
