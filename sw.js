@@ -1,20 +1,22 @@
-const CACHE_NAME = 'wilstaxtion-v1';
-const ASSETS = [
-  './',
-  './index.html',
-  './manifest.json',
-  'https://unpkg.com/leaflet/dist/leaflet.css',
-  'https://unpkg.com/leaflet/dist/leaflet.js'
+const CACHE_NAME = "wilstaxtion-v1";
+
+const urlsToCache = [
+  "/",
+  "/index.html",
+  "/admin.html",
+  "/manifest.json"
 ];
 
-self.addEventListener('install', (e) => {
-  e.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
+self.addEventListener("install", event => {
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(urlsToCache))
   );
 });
 
-self.addEventListener('fetch', (e) => {
-  e.respondWith(
-    fetch(e.request).catch(() => caches.match(e.request))
+self.addEventListener("fetch", event => {
+  event.respondWith(
+    caches.match(event.request)
+      .then(response => response || fetch(event.request))
   );
 });
