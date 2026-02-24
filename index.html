@@ -24,7 +24,20 @@
         .loader { width: 60px; height: 60px; border: 5px solid #1e293b; border-top: 5px solid var(--primary); border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        .btn-salir-global { position: fixed; top: 20px; right: 20px; z-index: 15000; background: rgba(231, 76, 60, 0.9); color: white; border: none; padding: 12px 20px; border-radius: 12px; font-weight: bold; }
+        /* Estilo de Botón Cargando */
+        .btn-loading {
+            opacity: 0.7;
+            pointer-events: none;
+            position: relative;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 0.7; }
+            50% { opacity: 0.4; }
+            100% { opacity: 0.7; }
+        }
+
+        .btn-salir-global { position: fixed; top: 20px; right: 20px; z-index: 15000; background: rgba(231, 76, 60, 0.9); color: white; border: none; padding: 12px 20px; border-radius: 12px; font-weight: bold; transition: 0.3s; }
 
         /* Auth */
         .full-screen { position: fixed; inset: 0; background: var(--dark); z-index: 9000; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 30px; }
@@ -81,7 +94,7 @@
 <div id="splash"><div class="loader"></div><h2 style="margin-top:20px; font-weight: 900;">WILSTAXTION PRO AI</h2></div>
 <div id="p-toast">ESTADO: SOLICITANDO...</div>
 
-<button id="mainLogoutBtn" class="btn-salir-global" style="display:none;" onclick="quickLogout()">SALIR</button>
+<button id="mainLogoutBtn" class="btn-salir-global" style="display:none;" onclick="quickLogout(this)">SALIR</button>
 
 <div id="authScreen" class="full-screen">
     <h1 style="color:var(--primary); margin-bottom: 30px; letter-spacing: 3px;">WILSTAXTION</h1>
@@ -129,8 +142,8 @@
     <h1 style="color:white; font-size: 32px; margin-bottom: 10px;">¡SOLICITUD DE VIAJE!</h1>
     <p id="clientName" style="color:var(--primary); font-size:28px; font-weight:bold; margin-bottom: 40px;"></p>
     <div style="display:flex; gap:20px; width:100%; max-width:400px;">
-        <button onclick="respondTrip('aceptado')" style="flex:1; padding:25px; background:var(--primary); color:var(--dark); border:none; border-radius:20px; font-weight:900; font-size: 20px;">ACEPTAR</button>
-        <button onclick="respondTrip('rechazado')" style="flex:1; padding:25px; background:var(--danger); color:white; border:none; border-radius:20px; font-weight:900; font-size: 20px;">RECHAZAR</button>
+        <button id="btnAcceptTrip" onclick="respondTrip('aceptado', this)" style="flex:1; padding:25px; background:var(--primary); color:var(--dark); border:none; border-radius:20px; font-weight:900; font-size: 20px;">ACEPTAR</button>
+        <button onclick="respondTrip('rechazado', this)" style="flex:1; padding:25px; background:var(--danger); color:white; border:none; border-radius:20px; font-weight:900; font-size: 20px;">RECHAZAR</button>
     </div>
 </div>
 
@@ -214,13 +227,18 @@
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(miniMap);
         myMarker = L.marker([0,0], {icon: L.divIcon({html: '<i class="fas fa-location-arrow" style="color:var(--primary); font-size:40px; transform:rotate(-45deg);"></i>'})}).addTo(miniMap);
 
-        // CORRECCIÓN: Filtramos por estado 'pendiente' y evitamos duplicar si ya estamos en viaje
         onSnapshot(query(collection(db, "viajes"), where("taxiId", "==", auth.currentUser.uid), where("status", "==", "pendiente")), snap => {
             snap.forEach(v => {
                 if(!inTrip && document.getElementById('tripAlert').style.display !== 'flex') {
                     window.activeTripId = v.id; 
                     window.pLoc = [v.data().lat, v.data().lng];
                     document.getElementById('clientName').innerText = v.data().pasajeroNombre;
+                    
+                    // Resetear estado del botón de aceptar por si se usa varias veces
+                    const btnAcc = document.getElementById('btnAcceptTrip');
+                    btnAcc.innerText = "ACEPTAR";
+                    btnAcc.classList.remove('btn-loading');
+
                     document.getElementById('tripAlert').style.display = 'flex';
                     
                     hablarIA("Solicitud de viaje entrante.");
@@ -252,29 +270,40 @@
         }
     };
 
-    window.respondTrip = async (status) => {
+    window.respondTrip = async (status, btnElement) => {
         clearInterval(callInterval);
+        
+        // Agregar efecto de carga al botón presionado
+        if(btnElement) {
+            btnElement.classList.add('btn-loading');
+            btnElement.innerText = status === 'aceptado' ? "CONECTANDO..." : "RECHAZANDO...";
+        }
+
         if(status === 'aceptado') {
             inTrip = true;
-            await updateDoc(doc(db, "viajes", window.activeTripId), { status: 'aceptado' });
-            await updateDoc(doc(db, "activos", auth.currentUser.uid), { busy: true });
-            document.getElementById('tripAlert').style.display = 'none';
-            document.getElementById('driverUI').style.display = 'flex';
-            hablarIA("Ruta trazada.");
+            try {
+                await updateDoc(doc(db, "viajes", window.activeTripId), { status: 'aceptado' });
+                await updateDoc(doc(db, "activos", auth.currentUser.uid), { busy: true });
+                document.getElementById('tripAlert').style.display = 'none';
+                document.getElementById('driverUI').style.display = 'flex';
+                hablarIA("Ruta trazada.");
 
-            // CORRECCIÓN: Marcado automático de ruta con limpieza previa
-            if(routingControl) miniMap.removeControl(routingControl);
-            routingControl = L.Routing.control({
-                waypoints: [
-                    L.latLng(lastPos[0], lastPos[1]), 
-                    L.latLng(window.pLoc[0], window.pLoc[1])
-                ],
-                createMarker: () => null,
-                lineOptions: { styles: [{ color: '#2ecc71', weight: 8 }] },
-                addWaypoints: false,
-                draggableWaypoints: false,
-                fitSelectedRoutes: true
-            }).addTo(miniMap);
+                if(routingControl) miniMap.removeControl(routingControl);
+                routingControl = L.Routing.control({
+                    waypoints: [
+                        L.latLng(lastPos[0], lastPos[1]), 
+                        L.latLng(window.pLoc[0], window.pLoc[1])
+                    ],
+                    createMarker: () => null,
+                    lineOptions: { styles: [{ color: '#2ecc71', weight: 8 }] },
+                    addWaypoints: false,
+                    draggableWaypoints: false,
+                    fitSelectedRoutes: true
+                }).addTo(miniMap);
+            } catch (e) {
+                btnElement.classList.remove('btn-loading');
+                btnElement.innerText = "ERROR";
+            }
         } else {
             await updateDoc(doc(db, "viajes", window.activeTripId), { status: 'rechazado' });
             document.getElementById('tripAlert').style.display = 'none';
@@ -300,14 +329,16 @@
                     const card = document.createElement('div');
                     card.style = "background:#1f2937; padding:18px; border-radius:20px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; border-left: 5px solid var(--primary);";
                     card.innerHTML = `<div><b>${t.nombre}</b><br><small style="color:#aaa">${t.auto} | ${t.placa}</small></div>` +
-                                     (!t.busy ? `<button onclick="requestRide('${d.id}', '${t.nombre}')" style="background:var(--primary); padding:15px; border-radius:12px; border:none; font-weight:bold; color:var(--dark);">SOLICITAR</button>` : '<span style="color:var(--danger)">OCUPADO</span>');
+                                     (!t.busy ? `<button onclick="requestRide('${d.id}', '${t.nombre}', this)" style="background:var(--primary); padding:15px; border-radius:12px; border:none; font-weight:bold; color:var(--dark);">SOLICITAR</button>` : '<span style="color:var(--danger)">OCUPADO</span>');
                     list.appendChild(card);
                 }
             });
         });
     }
 
-    window.requestRide = async (taxiId, dName) => {
+    window.requestRide = async (taxiId, dName, btn) => {
+        if(btn) btn.classList.add('btn-loading');
+        
         const toast = document.getElementById('p-toast');
         toast.style.display = 'flex';
         toast.innerText = "SOLICITANDO...";
@@ -319,7 +350,6 @@
             taxiId, status: 'pendiente', lat: userPos[0], lng: userPos[1], timestamp: serverTimestamp() 
         });
 
-        // Escuchar respuesta específica de este viaje
         onSnapshot(doc(db, "viajes", docRef.id), v => {
             if(v.data()?.status === 'aceptado') {
                 toast.innerText = "¡VIAJE ACEPTADO!";
@@ -344,7 +374,19 @@
         document.getElementById('btnRT').classList.toggle('active', r === 'taxi');
         document.getElementById('loginFields').innerHTML = r === 'pasajero' ? `<input type="text" id="p-name" placeholder="Tu Nombre">` : `<input type="email" id="t-email" placeholder="Email"><input type="password" id="t-pass" placeholder="Contraseña">`;
     };
-    window.quickLogout = () => { auth.signOut(); location.reload(); };
+
+    window.quickLogout = (btn) => { 
+        if(btn) {
+            btn.classList.add('btn-loading');
+            btn.innerText = "SALIENDO...";
+        }
+        hablarIA("Cerrando sesión.");
+        setTimeout(() => {
+            auth.signOut(); 
+            location.reload(); 
+        }, 800);
+    };
+
     setTimeout(() => document.getElementById('splash').style.display='none', 2000);
 </script>
 </body>
