@@ -224,7 +224,7 @@
             }
         }
         
-        hablarIA(`Color de ruta cambiado a ${color === '#2ecc71' ? 'verde' : color === '#3498db' ? 'azul' : 'otro color seleccionado'}.`);
+        hablarIA("Color de ruta cambiado.");
     };
 
     window.handleAuth = async () => {
@@ -241,7 +241,7 @@
                 await signInWithEmailAndPassword(auth, email, pass);
                 loggedUserName = email.split('@')[0].toUpperCase();
             } catch (err) {
-                alert("Credenciales incorrectas o error de conexión");
+                alert("Credenciales incorrectas");
             }
         }
     };
@@ -301,7 +301,7 @@
         document.getElementById('statusLabel').innerText = isOff ? "FUERA DE SERVICIO" : "EN LÍNEA";
 
         if(!isOff) {
-            hablarIA("Estás en línea y disponible para recibir viajes.");
+            hablarIA("Estás en línea.");
             geoWatch = navigator.geolocation.watchPosition(p => {
                 const c = [p.coords.latitude, p.coords.longitude];
                 lastPos = c;
@@ -310,19 +310,12 @@
                 
                 const pInfo = JSON.parse(localStorage.getItem('driverProfile')) || {auto:"Taxi", placa:"---"};
                 setDoc(doc(db, "activos", auth.currentUser.uid), {
-                    nombre: loggedUserName,
-                    ...pInfo,
-                    lat: c[0],
-                    lng: c[1],
-                    online: true,
-                    busy: inTrip,
-                    updated: serverTimestamp()
+                    nombre: loggedUserName, ...pInfo, lat: c[0], lng: c[1], online: true, busy: inTrip
                 }, {merge: true});
-            }, err => console.log("Geolocalización error:", err), {enableHighAccuracy: true, timeout: 5000, maximumAge: 0});
+            }, null, {enableHighAccuracy: true});
         } else {
             if(geoWatch) navigator.geolocation.clearWatch(geoWatch);
-            updateDoc(doc(db, "activos", auth.currentUser.uid), { online: false, busy: false });
-            hablarIA("Has salido de línea.");
+            updateDoc(doc(db, "activos", auth.currentUser.uid), { online: false });
         }
     };
 
@@ -338,63 +331,33 @@
             try {
                 await updateDoc(doc(db, "viajes", window.activeTripId), { 
                     status: 'aceptado',
-                    acceptedAt: serverTimestamp(),
-                    driverName: loggedUserName,
-                    driverId: auth.currentUser.uid
+                    driverName: loggedUserName
                 });
 
-                await updateDoc(doc(db, "activos", auth.currentUser.uid), { 
-                    busy: true,
-                    currentTrip: window.activeTripId 
-                });
-
+                await updateDoc(doc(db, "activos", auth.currentUser.uid), { busy: true });
                 document.getElementById('tripAlert').style.display = 'none';
                 document.getElementById('driverUI').style.display = 'flex';
 
-                hablarIA("Viaje aceptado. Ruta trazada hacia el pasajero.");
+                hablarIA("Viaje aceptado. Ruta trazada.");
 
                 if (routingControl) miniMap.removeControl(routingControl);
                 
                 routingControl = L.Routing.control({
-                    waypoints: [
-                        L.latLng(lastPos[0], lastPos[1]),
-                        L.latLng(window.pLoc[0], window.pLoc[1])
-                    ],
+                    waypoints: [L.latLng(lastPos[0], lastPos[1]), L.latLng(window.pLoc[0], window.pLoc[1])],
                     createMarker: () => null,
-                    lineOptions: { 
-                        styles: [{ 
-                            color: currentRouteColor, 
-                            weight: 8, 
-                            opacity: 0.92 
-                        }] 
-                    },
-                    router: L.Routing.osrmv1({
-                        serviceUrl: 'https://router.project-osrm.org/route/v1'
-                    }),
+                    lineOptions: { styles: [{ color: currentRouteColor, weight: 8, opacity: 0.92 }] },
                     addWaypoints: false,
                     draggableWaypoints: false,
-                    fitSelectedRoutes: 'smart'
+                    fitSelectedRoutes: true
                 }).addTo(miniMap);
-
-                miniMap.setView(lastPos, 15);
 
             } catch (e) {
                 console.error(e);
-                if (btnElement) {
-                    btnElement.innerText = "ERROR";
-                    setTimeout(() => { btnElement.innerText = "ACEPTAR"; btnElement.classList.remove('btn-loading'); }, 2500);
-                }
-                hablarIA("No se pudo aceptar el viaje. Intenta de nuevo.");
             }
         } else {
             await updateDoc(doc(db, "viajes", window.activeTripId), { status: 'rechazado' });
             document.getElementById('tripAlert').style.display = 'none';
             hablarIA("Solicitud rechazada.");
-        }
-
-        if (btnElement) {
-            btnElement.classList.remove('btn-loading');
-            if (status === 'rechazado') btnElement.innerText = "RECHAZAR";
         }
     };
 
@@ -405,10 +368,8 @@
                 map = L.map('map', {zoomControl: false}).setView(userPos, 17);
                 L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
                 L.circleMarker(userPos, {radius: 10, color: '#3498db', fillColor: '#3498db', fillOpacity: 0.7}).addTo(map);
-            } else {
-                map.setView(userPos, 17);
             }
-        }, err => console.log("Error geolocalización pasajero:", err), {enableHighAccuracy: true});
+        }, null, {enableHighAccuracy: true});
 
         onSnapshot(collection(db, "activos"), snap => {
             const list = document.getElementById('taxiList');
@@ -419,13 +380,8 @@
                     const card = document.createElement('div');
                     card.style = "background:#1f2937; padding:18px; border-radius:20px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; border-left:5px solid var(--primary);";
                     card.innerHTML = `
-                        <div>
-                            <b>${t.nombre}</b><br>
-                            <small style="color:#aaa">${t.auto || 'Vehículo'} • ${t.placa || '—'}</small>
-                        </div>
-                        <button onclick="requestRide('${d.id}', '${t.nombre}', this)" style="background:var(--primary); padding:14px 20px; border-radius:12px; border:none; font-weight:bold; color:var(--dark);">
-                            SOLICITAR
-                        </button>`;
+                        <div><b>${t.nombre}</b><br><small style="color:#aaa">${t.auto || 'Vehículo'} • ${t.placa || '—'}</small></div>
+                        <button onclick="requestRide('${d.id}', '${t.nombre}', this)" style="background:var(--primary); padding:14px 20px; border-radius:12px; border:none; font-weight:bold; color:var(--dark);">SOLICITAR</button>`;
                     list.appendChild(card);
                 }
             });
@@ -433,83 +389,36 @@
     }
 
     window.requestRide = async (taxiId, dName, btn) => {
-        btn.disabled = true;
-        btn.innerText = "ENVIANDO...";
-        
         const toast = document.getElementById('p-toast');
         toast.style.display = 'flex';
         toast.innerHTML = "Solicitando unidad...";
         toast.style.background = "var(--secondary)";
-        hablarIA("Enviando solicitud de viaje.");
+        hablarIA("Enviando solicitud.");
 
-        try {
-            const docRef = await addDoc(collection(db, "viajes"), { 
-                pasajeroId: auth.currentUser.uid, 
-                pasajeroNombre: localStorage.getItem('pName') || "Pasajero", 
-                taxiId, 
-                status: 'pendiente', 
-                lat: userPos[0], 
-                lng: userPos[1], 
-                timestamp: serverTimestamp() 
-            });
+        const docRef = await addDoc(collection(db, "viajes"), { 
+            pasajeroId: auth.currentUser.uid, pasajeroNombre: localStorage.getItem('pName'), 
+            taxiId, status: 'pendiente', lat: userPos[0], lng: userPos[1], timestamp: serverTimestamp() 
+        });
 
-            onSnapshot(doc(db, "viajes", docRef.id), (snap) => {
-                const data = snap.data();
-                if (!data) return;
-
-                if (data.status === 'aceptado') {
-                    toast.innerHTML = `
-                        ¡VIAJE ACEPTADO!<br>
-                        <span style="font-size:0.9em; opacity:0.9;">
-                            ${data.driverName || 'Tu conductor'} va en camino<br>
-                            <strong style="color:#ffeb3b;">Es muy importante que estés esperando en el lugar exacto</strong>
-                        </span>`;
-                    toast.style.background = "linear-gradient(135deg, #2ecc71, #27ae60)";
-                    toast.style.height = "auto";
-                    toast.style.padding = "20px";
-                    hablarIA("Tu conductor está en camino. Por favor espera en el lugar acordado. Es muy importante que estés ahí.");
-                    
-                    setTimeout(() => {
-                        if (toast.style.display !== 'none') toast.style.display = 'none';
-                    }, 15000);
-                }
-                else if (data.status === 'rechazado') {
-                    toast.innerHTML = "La solicitud fue rechazada";
-                    toast.style.background = "var(--danger)";
-                    hablarIA("El conductor rechazó la solicitud.");
-                    setTimeout(() => { toast.style.display = 'none'; }, 5000);
-                    btn.disabled = false;
-                    btn.innerText = "SOLICITAR";
-                }
-            });
-        } catch (err) {
-            console.error(err);
-            toast.innerHTML = "Error al enviar solicitud";
-            toast.style.background = "var(--danger)";
-            setTimeout(() => { toast.style.display = 'none'; }, 4000);
-            btn.disabled = false;
-            btn.innerText = "SOLICITAR";
-        }
+        onSnapshot(doc(db, "viajes", docRef.id), (snap) => {
+            const data = snap.data();
+            if (data?.status === 'aceptado') {
+                toast.innerHTML = `¡VIAJE ACEPTADO!<br><span style="font-size:0.9em;">El conductor va en camino.<br><strong style="color:#ffeb3b;">Es muy importante estar a la espera</strong></span>`;
+                toast.style.background = "linear-gradient(135deg, #2ecc71, #27ae60)";
+                hablarIA("Tu conductor va en camino. Es muy importante que estés a la espera.");
+                setTimeout(() => { toast.style.display = 'none'; }, 12000);
+            }
+        });
     };
 
     window.finishTrip = async () => {
-        if (!window.activeTripId) return;
         await updateDoc(doc(db, "viajes", window.activeTripId), { status: 'finalizado' });
-        await updateDoc(doc(db, "activos", auth.currentUser.uid), { 
-            busy: false,
-            currentTrip: null 
-        });
-        hablarIA("Servicio finalizado. Gracias por tu trabajo.");
-        inTrip = false;
-        if (routingControl) {
-            miniMap.removeControl(routingControl);
-            routingControl = null;
-        }
+        await updateDoc(doc(db, "activos", auth.currentUser.uid), { busy: false });
+        hablarIA("Servicio finalizado.");
         location.reload();
     };
 
     window.toggleAcc = () => document.getElementById('accContent').classList.toggle('open');
-
     window.setRole = (r) => {
         role = r;
         document.getElementById('btnRP').classList.toggle('active', r === 'pasajero');
@@ -520,14 +429,9 @@
     };
 
     window.quickLogout = (btn) => { 
-        if(btn) {
-            btn.classList.add('btn-loading');
-            btn.innerText = "SALIENDO...";
-        }
+        if(btn) btn.innerText = "SALIENDO...";
         hablarIA("Cerrando sesión.");
-        setTimeout(() => {
-            signOut(auth).then(() => location.reload());
-        }, 800);
+        setTimeout(() => { signOut(auth).then(() => location.reload()); }, 800);
     };
 
     setTimeout(() => document.getElementById('splash').style.display='none', 1800);
