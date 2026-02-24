@@ -10,101 +10,140 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="manifest" href="./manifest.json">
     <meta name="theme-color" content="#2ecc71">
+    <link rel="apple-touch-icon" href="/icons/icon-192.png">
 
     <style>
         :root {
             --primary: #2ecc71; --secondary: #3498db; --dark: #070b14;
             --card-bg: #111827; --danger: #e74c3c; --text: #f8fafc; --warning: #f1c40f;
         }
-        * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI',sans-serif; -webkit-tap-highlight-color:transparent; }
-        body { background:var(--dark); min-height:100vh; color:var(--text); overflow-x:hidden; }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
         
-        #splash { position:fixed; inset:0; background:var(--dark); z-index:20000; display:flex; flex-direction:column; align-items:center; justify-content:center; }
-        .loader { width:60px; height:60px; border:5px solid #1e293b; border-top:5px solid var(--primary); border-radius:50%; animation:spin 1s linear infinite; }
-        @keyframes spin { to { transform:rotate(360deg); } }
+        body { background: var(--dark); min-height: 100vh; color: var(--text); overflow-x: hidden; overflow-y: auto; }
 
-        .btn-salir-global { position:fixed; top:20px; right:20px; z-index:15000; background:rgba(231,76,60,0.9); color:white; border:none; padding:12px 20px; border-radius:12px; font-weight:bold; }
+        #splash { position: fixed; inset: 0; background: var(--dark); z-index: 20000; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .loader { width: 60px; height: 60px; border: 5px solid #1e293b; border-top: 5px solid var(--primary); border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        .full-screen { position:fixed; inset:0; background:var(--dark); z-index:9000; display:flex; flex-direction:column; justify-content:center; align-items:center; padding:30px; }
-        .role-btn { flex:1; padding:18px; border:2px solid #1e293b; border-radius:15px; cursor:pointer; text-align:center; font-weight:bold; color:white; background:var(--card-bg); }
-        .role-btn.active { border-color:var(--primary); background:rgba(46,204,113,0.1); color:var(--primary); }
-        input { width:100%; max-width:340px; padding:18px; margin:8px 0; border-radius:15px; border:1px solid #1e293b; background:var(--card-bg); color:white; outline:none; }
-        .btn-entrar { width:100%; max-width:340px; padding:18px; background:var(--primary); color:var(--dark); border:none; border-radius:15px; font-weight:900; text-transform:uppercase; margin-top:15px; }
+        .btn-salir-global { position: fixed; top: 20px; right: 20px; z-index: 15000; background: rgba(231, 76, 60, 0.9); color: white; border: none; padding: 12px 20px; border-radius: 12px; font-weight: bold; }
 
-        #mapContainer, #miniMapContainer { height:50vh; position:relative; background:#000; }
-        #map, #miniMap { height:100%; width:100%; }
+        .full-screen { position: fixed; inset: 0; background: var(--dark); z-index: 9000; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 30px; }
+        .role-btn { flex: 1; padding: 18px; border: 2px solid #1e293b; border-radius: 15px; cursor: pointer; text-align: center; font-weight: bold; color: white; background: var(--card-bg); }
+        .role-btn.active { border-color: var(--primary); background: rgba(46, 204, 113, 0.1); color: var(--primary); }
+        input { width: 100%; max-width: 340px; padding: 18px; margin: 8px 0; border-radius: 15px; border: 1px solid #1e293b; background: var(--card-bg); color: white; outline: none; }
+        .btn-entrar { width: 100%; max-width: 340px; padding: 18px; background: var(--primary); color: var(--dark); border: none; border-radius: 15px; font-weight: 900; text-transform: uppercase; margin-top: 15px; }
 
-        .map-mode-ctrl { position:absolute; top:15px; right:15px; z-index:1001; display:flex; flex-direction:column; gap:8px; background:rgba(17,24,39,0.85); padding:8px; border-radius:12px; border:1px solid rgba(255,255,255,0.1); }
-        .mode-btn { width:42px; height:42px; border-radius:8px; border:none; background:#1f2937; color:white; cursor:pointer; font-size:16px; display:flex; align-items:center; justify-content:center; }
-        .mode-btn.active { background:var(--primary); color:var(--dark); }
+        #mapContainer { height: 55vh; position: relative; background: #000; }
+        #miniMapContainer { height: 45vh; position: relative; overflow: hidden; background: #000; }
+        #map, #miniMap { height: 100%; width: 100%; }
+        
+        .map-mode-ctrl {
+            position: absolute; top: 15px; right: 15px; z-index: 1001;
+            display: flex; flex-direction: column; gap: 8px;
+            background: rgba(17, 24, 39, 0.85); padding: 8px; border-radius: 12px;
+            backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.1);
+        }
+        .mode-btn {
+            width: 42px; height: 42px; border-radius: 8px; border: none;
+            background: #1f2937; color: white; cursor: pointer; font-size: 16px;
+            display: flex; align-items: center; justify-content: center; transition: 0.3s;
+        }
+        .mode-btn.active { background: var(--primary); color: var(--dark); }
 
-        #p-toast { position:fixed; top:0; left:0; width:100%; background:var(--secondary); color:white; display:none; align-items:center; justify-content:center; z-index:25000; font-size:18px; font-weight:bold; padding:20px; box-shadow:0 5px 25px rgba(0,0,0,0.8); animation:slideDown 0.5s; }
-        @keyframes slideDown { from { transform:translateY(-100%); } to { transform:translateY(0); } }
+        #p-toast { 
+            position: fixed; top: 0; left: 0; width: 100%; 
+            background: var(--secondary); color: white; display: none; 
+            align-items: center; justify-content: center; z-index: 25000; 
+            font-size: 18px; font-weight: bold; text-align: center;
+            box-shadow: 0 5px 25px rgba(0,0,0,0.8); padding: 20px; line-height: 1.4;
+            animation: slideDown 0.5s forwards;
+        }
+        @keyframes slideDown { from { transform: translateY(-100%); } to { transform: translateY(0); } }
 
-        .p-panel { min-height:50vh; background:var(--card-bg); border-radius:30px 30px 0 0; margin-top:-30px; z-index:10; padding:25px; }
+        .p-panel { min-height: 45vh; background: var(--card-bg); border-radius: 30px 30px 0 0; margin-top: -30px; position: relative; z-index: 10; padding: 25px; }
+        
+        #taxiApp { display: none; flex-direction: column; min-height: 100vh; }
+        
+        .taxi-config-area { padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        .accordion { width: 100%; max-width: 340px; background: var(--card-bg); border-radius: 15px; margin-bottom: 15px; overflow: hidden; border: 1px solid #1e293b; }
+        .acc-header { padding: 15px; background: #1f2937; cursor: pointer; display: flex; justify-content: space-between; font-weight: bold; color: var(--primary); }
+        .acc-content { padding: 0; max-height: 0; transition: all 0.3s ease-out; overflow: hidden; }
+        .acc-content.open { padding: 15px; max-height: 800px; }
 
-        .status-circle { width:85px; height:85px; border-radius:50%; border:6px solid #1e293b; font-size:18px; font-weight:900; margin:15px auto; display:flex; align-items:center; justify-content:center; cursor:pointer; }
-        .status-circle.on { background:var(--primary); color:var(--dark); box-shadow:0 0 30px var(--primary); }
-        .status-circle.off { background:#1e293b; color:#4b5563; }
+        .status-circle { width: 85px; height: 85px; border-radius: 50%; border: 6px solid #1e293b; font-size: 18px; font-weight: 900; margin: 15px auto; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.4s; }
+        .status-circle.on { background: var(--primary); color: var(--dark); box-shadow: 0 0 30px var(--primary); }
+        .status-circle.off { background: #1e293b; color: #4b5563; }
+        
+        .driver-controls { position: absolute; bottom: 20px; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 10px; z-index: 1001; }
+        .btn-action { width: 85%; padding: 20px; border-radius: 50px; border: none; font-weight: bold; color: white; text-transform: uppercase; }
 
-        #tripAlert { position:fixed; inset:0; background:rgba(7,11,20,0.95); z-index:18000; display:none; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:40px; }
-        .call-anim { width:100px; height:100px; border-radius:50%; background:var(--primary); margin-bottom:30px; animation:ring 1.5s infinite; display:flex; align-items:center; justify-content:center; font-size:40px; color:var(--dark); }
-        @keyframes ring { 0%,100% { box-shadow:0 0 0 0 rgba(46,204,113,0.7); } 70% { box-shadow:0 0 0 50px rgba(46,204,113,0); } }
+        #tripAlert { 
+            position: fixed; inset: 0; background: rgba(7, 11, 20, 0.95); 
+            z-index: 18000; display: none; flex-direction: column; 
+            align-items: center; justify-content: center; text-align: center; padding: 40px;
+        }
+        .call-anim { width: 100px; height: 100px; border-radius: 50%; background: var(--primary); margin-bottom: 30px; animation: ring 1.5s infinite; display: flex; align-items: center; justify-content: center; font-size: 40px; color: var(--dark); }
+        @keyframes ring { 0% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.7); } 70% { box-shadow: 0 0 0 50px rgba(46, 204, 113, 0); } 100% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0); } }
 
-        .color-picker-btn { width:48px; height:48px; border-radius:50%; border:3px solid #444; cursor:pointer; }
-        .driver-marker { transition:transform 0.5s linear; }
+        .color-picker-btn { width: 48px; height: 48px; border-radius: 50%; border: 3px solid #444; cursor: pointer; }
+        .leaflet-routing-container { display: none !important; }
+
+        .driver-marker {
+            transition: transform 0.5s linear;
+        }
     </style>
 </head>
 <body>
 
-<div id="splash"><div class="loader"></div><h2 style="margin-top:20px; font-weight:900;">WILSTAXTION PRO AI</h2></div>
-<div id="p-toast">CARGANDO...</div>
+<div id="splash"><div class="loader"></div><h2 style="margin-top:20px; font-weight: 900;">WILSTAXTION PRO AI</h2></div>
+<div id="p-toast">ESTADO: SOLICITANDO...</div>
 
-<button id="mainLogoutBtn" class="btn-salir-global" style="display:none;" onclick="quickLogout()">SALIR</button>
+<button id="mainLogoutBtn" class="btn-salir-global" style="display:none;" onclick="quickLogout(this)">SALIR</button>
 
 <div id="authScreen" class="full-screen">
-    <h1 style="color:var(--primary); margin-bottom:30px; letter-spacing:3px;">WILSTAXTION</h1>
+    <h1 style="color:var(--primary); margin-bottom: 30px; letter-spacing: 3px;">WILSTAXTION</h1>
     <div style="display:flex; gap:10px; width:100%; max-width:340px; margin-bottom:20px;">
         <div class="role-btn active" id="btnRP" onclick="setRole('pasajero')">PASAJERO</div>
         <div class="role-btn" id="btnRT" onclick="setRole('taxi')">TAXISTA</div>
     </div>
-    <div id="loginFields" style="width:100%; max-width:340px; display:flex; flex-direction:column; align-items:center;">
+    <div id="loginFields" style="width:100%; display:flex; flex-direction:column; align-items:center;">
         <input type="text" id="p-name" placeholder="Tu Nombre">
     </div>
-    <button class="btn-entrar" onclick="handleAuth()">INGRESAR</button>
+    <button class="btn-entrar" onclick="handleAuth()">INGRESAR AL SISTEMA</button>
 </div>
 
 <div id="passengerApp" style="display:none; flex-direction:column; min-height:100vh;">
     <div id="mapContainer"><div id="map"></div></div>
     <div class="p-panel">
-        <h3 style="color:var(--primary);"><i class="fas fa-taxi"></i> Unidades Cercanas</h3>
+        <h3 style="color:var(--primary); margin-bottom:15px;"><i class="fas fa-taxi"></i> Unidades Cercanas</h3>
         <div id="taxiList"></div>
     </div>
 </div>
 
-<div id="taxiApp" style="display:none; flex-direction:column; min-height:100vh;">
-    <div style="padding:20px; display:flex; flex-direction:column; align-items:center;">
-        <div class="accordion" style="width:100%; max-width:340px; background:var(--card-bg); border-radius:15px; overflow:hidden; border:1px solid #1e293b; margin-bottom:20px;">
-            <div class="acc-header" onclick="document.getElementById('accContent').classList.toggle('open')" style="padding:15px; background:#1f2937; cursor:pointer; display:flex; justify-content:space-between; font-weight:bold; color:var(--primary);">
-                CONFIGURACIÓN VEHÍCULO <i class="fas fa-chevron-down"></i>
-            </div>
-            <div id="accContent" class="acc-content" style="max-height:0; overflow:hidden; transition:all 0.3s;">
-                <div style="padding:15px;">
-                    <input type="text" id="d-car-input" placeholder="Modelo del Vehículo">
-                    <input type="text" id="d-plate-input" placeholder="Número de Placa">
-                    <div style="margin:20px 0 10px; color:#aaa;">Color ruta GPS</div>
-                    <div style="display:flex; gap:12px; flex-wrap:wrap; justify-content:center;">
-                        <div class="color-picker-btn" style="background:#2ecc71" onclick="changeRouteColor('#2ecc71')"></div>
-                        <div class="color-picker-btn" style="background:#3498db" onclick="changeRouteColor('#3498db')"></div>
-                        <div class="color-picker-btn" style="background:#e74c3c" onclick="changeRouteColor('#e74c3c')"></div>
-                        <div class="color-picker-btn" style="background:#f1c40f" onclick="changeRouteColor('#f1c40f')"></div>
-                    </div>
-                    <button onclick="saveProfile()" style="width:100%; margin-top:15px; padding:15px; background:var(--secondary); border:none; border-radius:12px; color:white; font-weight:bold;">GUARDAR</button>
+<div id="taxiApp">
+    <div class="taxi-config-area">
+        <div class="accordion">
+            <div class="acc-header" onclick="toggleAcc()">CONFIGURACIÓN DEL VEHÍCULO <i class="fas fa-chevron-down"></i></div>
+            <div class="acc-content" id="accContent">
+                <input type="text" id="d-car-input" placeholder="Modelo del Vehículo">
+                <input type="text" id="d-plate-input" placeholder="Número de Placa">
+                
+                <div style="margin: 20px 0 10px; color:#aaa; font-size:0.95em;">Color de la ruta en el GPS</div>
+                <div style="display:flex; gap:12px; flex-wrap:wrap; justify-content:center; margin-bottom:15px;">
+                    <div class="color-picker-btn" style="background:#2ecc71" onclick="changeRouteColor('#2ecc71')"></div>
+                    <div class="color-picker-btn" style="background:#3498db" onclick="changeRouteColor('#3498db')"></div>
+                    <div class="color-picker-btn" style="background:#e74c3c" onclick="changeRouteColor('#e74c3c')"></div>
+                    <div class="color-picker-btn" style="background:#f1c40f" onclick="changeRouteColor('#f1c40f')"></div>
+                    <div class="color-picker-btn" style="background:#9b59b6" onclick="changeRouteColor('#9b59b6')"></div>
+                    <div class="color-picker-btn" style="background:#e67e22" onclick="changeRouteColor('#e67e22')"></div>
                 </div>
+                
+                <button onclick="saveProfile()" style="width:100%; padding:15px; background:var(--secondary); border:none; border-radius:12px; color:white; font-weight:bold; margin-top:10px;">GUARDAR DATOS</button>
             </div>
         </div>
         <div class="status-circle off" id="statusToggle" onclick="toggleWork()">OFF</div>
-        <p id="statusLabel" style="color:var(--primary); font-weight:bold; margin-top:10px;">SISTEMA EN ESPERA</p>
+        <p id="statusLabel" style="color:var(--primary); font-weight:bold;">SISTEMA EN ESPERA</p>
     </div>
     <div id="miniMapContainer">
         <div id="miniMap"></div>
@@ -113,19 +152,19 @@
             <button class="mode-btn" id="m-light" onclick="setMapStyle('light')"><i class="fas fa-sun"></i></button>
             <button class="mode-btn" id="m-sat" onclick="setMapStyle('sat')"><i class="fas fa-globe"></i></button>
         </div>
-        <div id="driverUI" style="position:absolute; bottom:20px; width:100%; text-align:center; display:none;">
-            <button class="btn-action" style="background:var(--primary); width:80%; padding:20px; border-radius:50px; border:none; font-weight:bold; color:var(--dark);" onclick="finishTrip()">TERMINAR VIAJE</button>
+        <div class="driver-controls" id="driverUI" style="display:none;">
+            <button class="btn-action" style="background:var(--primary);" onclick="finishTrip()">TERMINAR SERVICIO</button>
         </div>
     </div>
 </div>
 
 <div id="tripAlert">
     <div class="call-anim"><i class="fas fa-phone-alt"></i></div>
-    <h1 style="color:white; font-size:32px; margin:10px 0;">¡NUEVA SOLICITUD!</h1>
-    <p id="clientName" style="color:var(--primary); font-size:28px; font-weight:bold;"></p>
-    <div style="display:flex; gap:20px; width:90%; max-width:400px; margin-top:30px;">
-        <button onclick="respondTrip('aceptado')" style="flex:1; padding:20px; background:var(--primary); color:var(--dark); border:none; border-radius:20px; font-weight:900;">ACEPTAR</button>
-        <button onclick="respondTrip('rechazado')" style="flex:1; padding:20px; background:var(--danger); color:white; border:none; border-radius:20px; font-weight:900;">RECHAZAR</button>
+    <h1 style="color:white; font-size: 32px; margin-bottom: 10px;">¡SOLICITUD DE VIAJE!</h1>
+    <p id="clientName" style="color:var(--primary); font-size:28px; font-weight:bold; margin-bottom: 40px;"></p>
+    <div style="display:flex; gap:20px; width:100%; max-width:400px;">
+        <button id="btnAcceptTrip" onclick="respondTrip('aceptado')" style="flex:1; padding:25px; background:var(--primary); color:var(--dark); border:none; border-radius:20px; font-weight:900; font-size: 20px;">ACEPTAR</button>
+        <button onclick="respondTrip('rechazado')" style="flex:1; padding:25px; background:var(--danger); color:white; border:none; border-radius:20px; font-weight:900; font-size: 20px;">RECHAZAR</button>
     </div>
 </div>
 
@@ -134,7 +173,7 @@
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getAuth, signInAnonymously, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged, signOut, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
     import { getFirestore, doc, setDoc, collection, onSnapshot, query, where, addDoc, serverTimestamp, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
     const firebaseConfig = {
@@ -146,101 +185,177 @@
         appId: "1:1091576841981:web:1dd7bbefb518580fb76094"
     };
 
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
+    const firebaseApp = initializeApp(firebaseConfig);
+    const auth = getAuth(firebaseApp);
+    const db = getFirestore(firebaseApp);
 
-    let role = 'pasajero', map, miniMap, userPos, lastPos, myMarker, routingControl, geoWatch;
-    let currentMapLayer, inTrip = false, currentRouteColor = localStorage.getItem('routeColor') || '#2ecc71';
-    let loggedUserName = '', activeTripId, pLoc;
+    let role = 'pasajero';
+    let map, miniMap, userPos, lastPos = null, myMarker, routingControl, geoWatch;
+    let currentMapLayer, lastInstructionIndex = -1;
+    let loggedUserName = "Conductor", inTrip = false;
+    let currentRouteColor = localStorage.getItem('routeColor') || '#2ecc71';
+    let lastHeading = 0;
 
     const tileStyles = {
-        dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+        dark:  'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
         light: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-        sat: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+        sat:   'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
     };
 
-    function hablar(texto) {
-        const u = new SpeechSynthesisUtterance(texto);
-        u.lang = 'es-ES';
-        speechSynthesis.speak(u);
+    function hablarIA(texto) {
+        window.speechSynthesis.cancel();
+        const msg = new SpeechSynthesisUtterance(texto);
+        msg.lang = 'es-ES';
+        window.speechSynthesis.speak(msg);
     }
 
-    function toast(msg, dur = 4000, color = 'var(--secondary)') {
-        const t = document.getElementById('p-toast');
-        t.textContent = msg;
-        t.style.background = color;
-        t.style.display = 'flex';
-        setTimeout(() => t.style.display = 'none', dur);
-        hablar(msg);
+    function showToast(mensaje, duracion = 4000, color = 'var(--secondary)') {
+        const toast = document.getElementById('p-toast');
+        toast.innerText = mensaje;
+        toast.style.background = color;
+        toast.style.display = 'flex';
+        setTimeout(() => toast.style.display = 'none', duracion);
+        hablarIA(mensaje);
     }
 
-    window.setRole = r => {
-        role = r;
-        document.getElementById('btnRP').classList.toggle('active', r === 'pasajero');
-        document.getElementById('btnRT').classList.toggle('active', r === 'taxi');
-        document.getElementById('loginFields').innerHTML = r === 'pasajero' 
-            ? `<input type="text" id="p-name" placeholder="Tu Nombre">`
-            : `<input type="email" id="t-email" placeholder="Email"><input type="password" id="t-pass" placeholder="Contraseña">`;
+    function procesarInstruccionesGPS(e) {
+        if (!inTrip || !e.routes?.length || !lastPos) return;
+        const steps = e.routes[0].instructions;
+        const posActual = L.latLng(lastPos);
+
+        steps.forEach((step, idx) => {
+            const stepPos = e.routes[0].coordinates[step.index];
+            if (posActual.distanceTo(stepPos) < 40 && lastInstructionIndex !== idx) {
+                lastInstructionIndex = idx;
+                let text = step.text
+                    .replace('Turn left', 'Gire a la izquierda')
+                    .replace('Turn right', 'Gire a la derecha')
+                    .replace('Head', 'Continúe por')
+                    .replace('Slight', 'Ligero')
+                    .replace('Destination', 'Su destino');
+                hablarIA(`Próxima maniobra: ${text}`);
+            }
+        });
+    }
+
+    window.setMapStyle = (style) => {
+        if (!miniMap) return;
+        currentMapLayer?.remove();
+
+        let attribution = '© OpenStreetMap contributors';
+        if (style === 'sat') {
+            attribution = 'Tiles © Esri — Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, and the GIS User Community';
+        } else if (style === 'dark') {
+            attribution = '© OpenStreetMap & contributors, CartoDB';
+        }
+
+        currentMapLayer = L.tileLayer(tileStyles[style], {
+            attribution,
+            maxZoom: 19,
+            subdomains: style === 'dark' ? 'abcd' : '1234'
+        }).addTo(miniMap);
+
+        localStorage.setItem('driverMapPref', style);
+        document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(`m-${style}`).classList.add('active');
+    };
+
+    function loadSavedProfile() {
+        const saved = localStorage.getItem('driverProfile');
+        if (saved) {
+            const p = JSON.parse(saved);
+            document.getElementById('d-car-input').value = p.auto || '';
+            document.getElementById('d-plate-input').value = p.placa || '';
+        }
+    }
+
+    window.saveProfile = () => {
+        const profile = {
+            auto: document.getElementById('d-car-input').value.trim(),
+            placa: document.getElementById('d-plate-input').value.trim()
+        };
+        if (!profile.auto || !profile.placa) {
+            showToast("Completa modelo y placa", 3000, 'var(--danger)');
+            return;
+        }
+        localStorage.setItem('driverProfile', JSON.stringify(profile));
+        showToast("Datos del vehículo guardados", 3000);
+        document.getElementById('accContent').classList.remove('open');
+    };
+
+    window.changeRouteColor = (color) => {
+        currentRouteColor = color;
+        localStorage.setItem('routeColor', color);
+        if (routingControl && inTrip) {
+            const waypoints = routingControl.getWaypoints().filter(w => w.latLng);
+            miniMap.removeControl(routingControl);
+            routingControl = L.Routing.control({
+                waypoints,
+                createMarker: () => null,
+                lineOptions: { styles: [{ color, weight: 8, opacity: 0.9 }] },
+                addWaypoints: false
+            }).addTo(miniMap);
+        }
     };
 
     window.handleAuth = async () => {
         if (role === 'pasajero') {
             const name = document.getElementById('p-name')?.value?.trim();
-            if (!name) return toast("Ingresa tu nombre", 3000, 'var(--danger)');
+            if (!name) return showToast("Ingresa tu nombre", 3000, 'var(--danger)');
             localStorage.setItem('pName', name);
             await signInAnonymously(auth);
         } else {
             const email = document.getElementById('t-email')?.value?.trim();
-            const pass = document.getElementById('t-pass')?.value;
-            if (!email || !pass) return toast("Completa email y contraseña", 3000, 'var(--danger)');
+            const pass  = document.getElementById('t-pass')?.value;
+            if (!email || !pass) return showToast("Ingresa email y contraseña", 3000, 'var(--danger)');
             try {
-                await signInWithEmailAndPassword(auth, email, pass);
-                loggedUserName = email.split('@')[0].toUpperCase() || 'CONDUCTOR';
-            } catch (e) {
-                toast("Error al iniciar sesión. Verifica tus credenciales.", 4000, 'var(--danger)');
+                const cred = await signInWithEmailAndPassword(auth, email, pass);
+                loggedUserName = email.split('@')[0].toUpperCase();
+            } catch (err) {
+                showToast("Credenciales incorrectas o error de conexión", 4000, 'var(--danger)');
+                console.error(err);
                 return;
             }
         }
-        toast("Bienvenido a Wilstaxtion", 2500, 'var(--primary)');
+        showToast("Iniciando sesión...", 2000);
     };
 
     onAuthStateChanged(auth, user => {
         if (user) {
             document.getElementById('authScreen').style.display = 'none';
             document.getElementById('mainLogoutBtn').style.display = 'block';
-            role === 'pasajero' ? initPasajero() : initTaxista();
+            if (role === 'pasajero') startPassenger();
+            else startTaxi();
         }
     });
 
-    function initTaxista() {
+    function startTaxi() {
         document.getElementById('taxiApp').style.display = 'flex';
-        // Cargar datos vehículo guardados
-        const perf = JSON.parse(localStorage.getItem('driverProfile') || '{}');
-        document.getElementById('d-car-input').value = perf.auto || '';
-        document.getElementById('d-plate-input').value = perf.placa || '';
+        loadSavedProfile();
 
-        miniMap = L.map('miniMap', {zoomControl:false}).setView([0,0], 19);
-        setMapStyle(localStorage.getItem('driverMapPref') || 'dark');
+        if (!miniMap) {
+            miniMap = L.map('miniMap', { zoomControl: false }).setView([0,0], 19);
+            setMapStyle(localStorage.getItem('driverMapPref') || 'dark');
 
-        myMarker = L.marker([0,0], {
-            icon: L.divIcon({
-                html: '<i class="fas fa-location-arrow" style="color:var(--primary); font-size:40px; transform:rotate(-45deg);"></i>',
-                className: 'driver-marker',
-                iconSize: [48,48],
-                iconAnchor: [24,24]
-            })
-        }).addTo(miniMap);
+            myMarker = L.marker([0,0], {
+                icon: L.divIcon({
+                    html: '<i class="fas fa-location-arrow" style="color:var(--primary);font-size:40px;transform:rotate(-45deg);"></i>',
+                    className: 'driver-marker',
+                    iconSize: [48,48],
+                    iconAnchor: [24,24]
+                })
+            }).addTo(miniMap);
+        }
 
-        onSnapshot(query(collection(db,"viajes"), where("taxiId","==",auth.currentUser.uid), where("status","==","pendiente")), snap => {
-            snap.forEach(d => {
+        onSnapshot(query(collection(db, "viajes"), where("taxiId","==",auth.currentUser.uid), where("status","==","pendiente")), snap => {
+            snap.forEach(docSnap => {
                 if (!inTrip) {
-                    activeTripId = d.id;
-                    pLoc = [d.data().lat, d.data().lng];
-                    document.getElementById('clientName').textContent = d.data().pasajeroNombre;
+                    window.activeTripId = docSnap.id;
+                    window.pLoc = [docSnap.data().lat, docSnap.data().lng];
+                    document.getElementById('clientName').textContent = docSnap.data().pasajeroNombre;
                     document.getElementById('tripAlert').style.display = 'flex';
-                    toast("¡Nueva solicitud de viaje!", 8000, 'var(--warning)');
-                    hablar("Nueva solicitud recibida");
+                    showToast("¡Nueva solicitud de viaje!", 8000, 'var(--warning)');
+                    hablarIA("Nueva solicitud de viaje recibida");
                 }
             });
         });
@@ -248,120 +363,159 @@
 
     window.toggleWork = () => {
         const btn = document.getElementById('statusToggle');
-        const isOn = btn.classList.toggle('on');
-        btn.classList.toggle('off', !isOn);
-        btn.textContent = isOn ? 'ON' : 'OFF';
-        document.getElementById('statusLabel').textContent = isOn ? 'EN LÍNEA' : 'FUERA DE SERVICIO';
+        const turningOn = !btn.classList.contains('on');
 
-        if (isOn) {
-            geoWatch = navigator.geolocation.watchPosition(p => {
-                lastPos = [p.coords.latitude, p.coords.longitude];
-                myMarker.setLatLng(lastPos);
-                miniMap.setView(lastPos, 17);
-                setDoc(doc(db,"activos",auth.currentUser.uid), {
+        btn.classList.toggle('off', !turningOn);
+        btn.classList.toggle('on', turningOn);
+        btn.textContent = turningOn ? "ON" : "OFF";
+        document.getElementById('statusLabel').textContent = turningOn ? "EN LÍNEA" : "FUERA DE SERVICIO";
+
+        if (turningOn) {
+            showToast("Estás en línea – esperando solicitudes", 4000, 'var(--primary)');
+            geoWatch = navigator.geolocation.watchPosition(pos => {
+                const coords = [pos.coords.latitude, pos.coords.longitude];
+                lastPos = coords;
+                lastHeading = pos.coords.heading || lastHeading;
+
+                myMarker?.setLatLng(coords);
+                document.querySelector('.driver-marker i')?.style.setProperty('transform', `rotate(${lastHeading - 45}deg)`);
+
+                if (miniMap && !inTrip) miniMap.flyTo(coords, 18, {animate:true, duration:1.2});
+
+                setDoc(doc(db, "activos", auth.currentUser.uid), {
                     nombre: loggedUserName,
-                    lat: lastPos[0],
-                    lng: lastPos[1],
+                    lat: coords[0],
+                    lng: coords[1],
                     online: true,
-                    busy: inTrip
+                    busy: inTrip,
+                    heading: lastHeading
                 }, {merge:true});
-            }, null, {enableHighAccuracy:true});
+            }, null, {enableHighAccuracy:true, maximumAge:0});
         } else {
             if (geoWatch) navigator.geolocation.clearWatch(geoWatch);
-            updateDoc(doc(db,"activos",auth.currentUser.uid), {online:false});
+            updateDoc(doc(db, "activos", auth.currentUser.uid), {online: false});
+            showToast("Fuera de servicio", 3000, 'var(--danger)');
         }
     };
 
-    window.setMapStyle = s => {
-        currentMapLayer?.remove();
-        let attr = '© OpenStreetMap';
-        if (s === 'sat') attr = 'Tiles © Esri';
-        if (s === 'dark') attr = '© OpenStreetMap & CartoDB';
-        currentMapLayer = L.tileLayer(tileStyles[s], {attribution:attr, maxZoom:19}).addTo(miniMap);
-        localStorage.setItem('driverMapPref', s);
-    };
-
-    window.changeRouteColor = c => {
-        currentRouteColor = c;
-        localStorage.setItem('routeColor', c);
-    };
-
-    window.saveProfile = () => {
-        const auto = document.getElementById('d-car-input').value.trim();
-        const placa = document.getElementById('d-plate-input').value.trim();
-        if (!auto || !placa) return toast("Completa los datos del vehículo", 3000, 'var(--danger)');
-        localStorage.setItem('driverProfile', JSON.stringify({auto, placa}));
-        toast("Perfil guardado", 2500);
-    };
-
-    window.respondTrip = async st => {
+    window.respondTrip = async (status) => {
         document.getElementById('tripAlert').style.display = 'none';
-        if (st === 'aceptado') {
+
+        if (status === 'aceptado') {
             inTrip = true;
-            document.getElementById('driverUI').style.display = 'block';
-            await updateDoc(doc(db,"viajes",activeTripId), {status:'aceptado', driverName:loggedUserName});
-            await updateDoc(doc(db,"activos",auth.currentUser.uid), {busy:true});
+            document.getElementById('driverUI').style.display = 'flex';
+            showToast("Viaje aceptado – inicia navegación", 4000, 'var(--primary)');
+
+            await updateDoc(doc(db, "viajes", window.activeTripId), {
+                status: 'aceptado',
+                driverName: loggedUserName
+            });
+            await updateDoc(doc(db, "activos", auth.currentUser.uid), {busy: true});
 
             routingControl = L.Routing.control({
-                waypoints: [L.latLng(...lastPos), L.latLng(...pLoc)],
-                lineOptions: {styles:[{color:currentRouteColor, weight:7}]},
+                waypoints: [L.latLng(...lastPos), L.latLng(...window.pLoc)],
                 createMarker: () => null,
+                lineOptions: { styles: [{color: currentRouteColor, weight: 8, opacity: 0.9}] },
                 addWaypoints: false
             }).addTo(miniMap);
+
+            routingControl.on('routesfound', e => {
+                const km = (e.routes[0].summary.totalDistance / 1000).toFixed(1);
+                hablarIA(`Ruta calculada. Distancia aproximada: ${km} kilómetros`);
+                miniMap.on('move', () => procesarInstruccionesGPS(e));
+            });
         } else {
-            await updateDoc(doc(db,"viajes",activeTripId), {status:'rechazado'});
+            await updateDoc(doc(db, "viajes", window.activeTripId), {status: 'rechazado'});
+            showToast("Solicitud rechazada", 3000, 'var(--danger)');
         }
     };
 
-    function initPasajero() {
+    function startPassenger() {
         document.getElementById('passengerApp').style.display = 'flex';
+
         navigator.geolocation.getCurrentPosition(p => {
             userPos = [p.coords.latitude, p.coords.longitude];
-            map = L.map('map',{zoomControl:false}).setView(userPos,16);
-            L.tileLayer(tileStyles.dark).addTo(map);
+            if (!map) {
+                map = L.map('map', {zoomControl:false}).setView(userPos, 17);
+                L.tileLayer(tileStyles.dark, {attribution: '© OpenStreetMap & contributors, CartoDB'}).addTo(map);
+                L.circleMarker(userPos, {radius:12, color:'#3498db', fillOpacity:0.6}).addTo(map);
+            }
         });
 
-        onSnapshot(collection(db,"activos"), snap => {
-            const lst = document.getElementById('taxiList');
-            lst.innerHTML = '';
+        onSnapshot(collection(db, "activos"), snap => {
+            const list = document.getElementById('taxiList');
+            list.innerHTML = '';
             snap.forEach(d => {
-                const t = d.data();
-                if (t.online && !t.busy) {
-                    const div = document.createElement('div');
-                    div.innerHTML = `<div style="padding:15px; background:#1f2937; border-radius:15px; margin:10px 0; display:flex; justify-content:space-between;">
-                        <div><b>${t.nombre}</b><br><small>${t.auto||'Taxi'}</small></div>
-                        <button onclick="solicitar('${d.id}')" style="background:var(--primary); padding:10px 20px; border:none; border-radius:10px; font-weight:bold;">SOLICITAR</button>
-                    </div>`;
-                    lst.appendChild(div);
+                const data = d.data();
+                if (data.online && !data.busy) {
+                    const el = document.createElement('div');
+                    el.style.cssText = "background:#1f2937; padding:18px; border-radius:20px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; border-left:5px solid var(--primary);";
+                    el.innerHTML = `
+                        <div>
+                            <b>${data.nombre}</b><br>
+                            <small>${data.auto || 'Vehículo disponible'}</small>
+                        </div>
+                        <button onclick="requestRide('${d.id}')" style="background:var(--primary); padding:12px 20px; border-radius:12px; border:none; font-weight:bold; color:var(--dark);">SOLICITAR</button>
+                    `;
+                    list.appendChild(el);
                 }
             });
         });
     }
 
-    window.solicitar = async id => {
-        const ref = await addDoc(collection(db,"viajes"), {
-            pasajeroNombre: localStorage.getItem('pName'),
-            taxiId: id,
+    window.requestRide = async (taxiId) => {
+        showToast("Enviando solicitud...", 5000);
+        const ref = await addDoc(collection(db, "viajes"), {
+            pasajeroId: auth.currentUser.uid,
+            pasajeroNombre: localStorage.getItem('pName') || "Pasajero",
+            taxiId,
             status: 'pendiente',
             lat: userPos[0],
             lng: userPos[1],
             timestamp: serverTimestamp()
         });
-        toast("Solicitud enviada", 4000);
+
+        onSnapshot(doc(db, "viajes", ref.id), snap => {
+            const d = snap.data();
+            if (d?.status === 'aceptado') {
+                showToast(`¡Aceptado por ${d.driverName}!`, 7000, 'var(--primary)');
+                hablarIA("Tu viaje ha sido aceptado");
+            } else if (d?.status === 'rechazado') {
+                showToast("El conductor rechazó la solicitud", 5000, 'var(--danger)');
+            }
+        });
     };
 
     window.finishTrip = async () => {
-        await updateDoc(doc(db,"viajes",activeTripId),{status:'finalizado'});
-        await updateDoc(doc(db,"activos",auth.currentUser.uid),{busy:false});
+        showToast("Viaje finalizado", 4000, 'var(--primary)');
+        hablarIA("Servicio terminado. Gracias por usar Wilstaxtion Pro");
+
+        await updateDoc(doc(db, "viajes", window.activeTripId), {status: 'finalizado'});
+        await updateDoc(doc(db, "activos", auth.currentUser.uid), {busy: false});
+
         inTrip = false;
         routingControl?.remove();
+        routingControl = null;
         document.getElementById('driverUI').style.display = 'none';
-        toast("Viaje finalizado", 3000, 'var(--primary)');
     };
 
-    window.quickLogout = () => signOut(auth).then(() => location.reload());
+    window.toggleAcc = () => document.getElementById('accContent').classList.toggle('open');
 
-    setTimeout(() => document.getElementById('splash').style.display='none', 1500);
+    window.setRole = (r) => {
+        role = r;
+        document.getElementById('btnRP').classList.toggle('active', r === 'pasajero');
+        document.getElementById('btnRT').classList.toggle('active', r === 'taxi');
+
+        document.getElementById('loginFields').innerHTML = r === 'pasajero'
+            ? `<input type="text" id="p-name" placeholder="Tu Nombre">`
+            : `<input type="email" id="t-email" placeholder="Email"><input type="password" id="t-pass" placeholder="Contraseña">`;
+    };
+
+    window.quickLogout = () => {
+        signOut(auth).then(() => location.reload());
+    };
+
+    setTimeout(() => document.getElementById('splash').style.display = 'none', 1800);
 </script>
 </body>
 </html>
