@@ -1,7 +1,7 @@
 {
   "name": "Wilstaxtion Pro AI",
   "short_name": "Wilstaxtion",
-  "start_url": "/index.html",
+  "start_url": "./index.html"
   "display": "standalone",
   "background_color": "#070b14",
   "theme_color": "#2ecc71",
