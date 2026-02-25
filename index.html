@@ -11,6 +11,7 @@
     <link rel="manifest" href="./manifest.json">
     <meta name="theme-color" content="#2ecc71">
     <link rel="apple-touch-icon" href="/icons/icon-192.png">
+
     <style>
         :root {
             --primary: #2ecc71; --secondary: #3498db; --dark: #070b14;
@@ -35,7 +36,7 @@
         .full-screen { position: fixed; inset: 0; background: var(--dark); z-index: 9000; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 30px; }
         .role-btn { flex: 1; padding: 18px; border: 2px solid #1e293b; border-radius: 15px; cursor: pointer; text-align: center; font-weight: bold; color: white; background: var(--card-bg); }
         .role-btn.active { border-color: var(--primary); background: rgba(46, 204, 113, 0.1); color: var(--primary); }
-        input { width: 100%; max-width: 340px; padding: 18px; margin: 8px 0; border-radius: 15px; border: 1px solid #1e293b; background: var(--card-bg); color: white; outline: none; }
+        input, select { width: 100%; max-width: 340px; padding: 18px; margin: 8px 0; border-radius: 15px; border: 1px solid #1e293b; background: var(--card-bg); color: white; outline: none; }
         .btn-entrar { width: 100%; max-width: 340px; padding: 18px; background: var(--primary); color: var(--dark); border: none; border-radius: 15px; font-weight: 900; text-transform: uppercase; margin-top: 15px; }
 
         /* Mapas */
@@ -43,6 +44,15 @@
         #miniMapContainer { height: 45vh; position: relative; overflow: hidden; background: #000; }
         #map, #miniMap { height: 100%; width: 100%; }
         
+        /* MOVIMIENTO SUAVE DEL MARCADOR GPS */
+        .leaflet-marker-pane img,
+        .leaflet-marker-pane .driver-marker {
+            transition: transform 0.4s ease-out !important;
+        }
+        #miniMap .leaflet-marker-pane .driver-marker {
+            transition: transform 0.35s cubic-bezier(0.25, 0.1, 0.25, 1) !important;
+        }
+
         #p-toast { 
             position: fixed; top: 0; left: 0; width: 100%; 
             background: var(--secondary); color: white; display: none; 
@@ -61,7 +71,7 @@
         .accordion { width: 100%; max-width: 340px; background: var(--card-bg); border-radius: 15px; margin-bottom: 15px; overflow: hidden; border: 1px solid #1e293b; }
         .acc-header { padding: 15px; background: #1f2937; cursor: pointer; display: flex; justify-content: space-between; font-weight: bold; color: var(--primary); }
         .acc-content { padding: 0; max-height: 0; transition: all 0.3s ease-out; overflow: hidden; }
-        .acc-content.open { padding: 15px; max-height: 800px; }
+        .acc-content.open { padding: 15px; max-height: 1200px; }
 
         .status-circle { width: 85px; height: 85px; border-radius: 50%; border: 6px solid #1e293b; font-size: 18px; font-weight: 900; margin: 15px auto; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.4s; }
         .status-circle.on { background: var(--primary); color: var(--dark); box-shadow: 0 0 30px var(--primary); }
@@ -127,8 +137,17 @@
                     <div class="color-picker-btn" style="background:#9b59b6" onclick="changeRouteColor('#9b59b6')"></div>
                     <div class="color-picker-btn" style="background:#e67e22" onclick="changeRouteColor('#e67e22')"></div>
                 </div>
+
+                <div style="margin: 25px 0 10px; color:#aaa; font-size:0.95em;">Estilo del mapa (GPS)</div>
+                <select id="mapStyleSelect">
+                    <option value="carto-dark">Carto Dark (noche)</option>
+                    <option value="osm">OpenStreetMap Classic</option>
+                    <option value="carto-light">Carto Light (día)</option>
+                    <option value="stamen-toner">Toner Voyager (alto contraste)</option>
+                    <option value="alidade-dark">Alidade Smooth Dark</option>
+                </select>
                 
-                <button onclick="saveProfile()" style="width:100%; padding:15px; background:var(--secondary); border:none; border-radius:12px; color:white; font-weight:bold; margin-top:10px;">GUARDAR DATOS</button>
+                <button onclick="saveProfile()" style="width:100%; padding:15px; background:var(--secondary); border:none; border-radius:12px; color:white; font-weight:bold; margin-top:20px;">GUARDAR DATOS</button>
             </div>
         </div>
         <div class="status-circle off" id="statusToggle" onclick="toggleWork()">OFF</div>
@@ -176,6 +195,8 @@
     let role = 'pasajero', map, miniMap, userPos, lastPos = null, myMarker, routingControl, geoWatch;
     let loggedUserName = "Conductor", inTrip = false, callInterval;
     let currentRouteColor = localStorage.getItem('routeColor') || '#2ecc71';
+    let currentMapStyle = localStorage.getItem('mapStyle') || 'carto-dark';
+    let mainTileLayer, miniTileLayer;
 
     function hablarIA(texto) {
         window.speechSynthesis.cancel();
@@ -201,7 +222,8 @@
         if(!profile.auto || !profile.placa) return alert("Por favor completa los datos del vehículo.");
         localStorage.setItem('driverProfile', JSON.stringify(profile));
         localStorage.setItem('routeColor', currentRouteColor);
-        hablarIA("Perfil y color de ruta guardados.");
+        localStorage.setItem('mapStyle', currentMapStyle);
+        hablarIA("Perfil, color de ruta y estilo de mapa guardados.");
         document.getElementById('accContent').classList.remove('open');
     };
 
@@ -219,13 +241,45 @@
                     lineOptions: { styles: [{ color: currentRouteColor, weight: 8, opacity: 0.92 }] },
                     addWaypoints: false,
                     draggableWaypoints: false,
-                    fitSelectedRoutes: true
+                    fitSelectedRoutes: true,
+                    router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1/driving/' })
                 }).addTo(miniMap);
             }
         }
         
         hablarIA(`Color de ruta cambiado a ${color === '#2ecc71' ? 'verde' : color === '#3498db' ? 'azul' : 'otro color seleccionado'}.`);
     };
+
+    function getTileUrl(style) {
+        const providers = {
+            'carto-dark':   'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+            'osm':          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+            'carto-light':  'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+            'stamen-toner': 'https://tiles.stadiamaps.com/tiles/stamen_toner/{z}/{x}/{y}{r}.png',
+            'alidade-dark': 'https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png',
+        };
+        return providers[style] || providers['carto-dark'];
+    }
+
+    function changeMapStyle(style) {
+        currentMapStyle = style;
+        const url = getTileUrl(style);
+
+        if (miniTileLayer) miniMap.removeLayer(miniTileLayer);
+        miniTileLayer = L.tileLayer(url, {
+            attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors | © CARTO / Stadia',
+            subdomains: 'abcd'
+        }).addTo(miniMap);
+
+        if (map && mainTileLayer) {
+            map.removeLayer(mainTileLayer);
+            mainTileLayer = L.tileLayer(url, {
+                attribution: miniTileLayer.options.attribution
+            }).addTo(map);
+        }
+
+        hablarIA(`Mapa cambiado a ${style.replace('-', ' ')}`);
+    }
 
     window.handleAuth = async () => {
         if(role === 'pasajero') {
@@ -266,7 +320,10 @@
         loadSavedProfile();
         if(!miniMap) {
             miniMap = L.map('miniMap', {zoomControl: false}).setView([0,0], 19);
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(miniMap);
+            miniTileLayer = L.tileLayer(getTileUrl(currentMapStyle), {
+                attribution: '© OpenStreetMap contributors | © CARTO / Stadia'
+            }).addTo(miniMap);
+
             myMarker = L.marker([0,0], {
                 icon: L.divIcon({
                     html: '<i class="fas fa-location-arrow" style="color:var(--primary); font-size:40px; transform:rotate(-45deg);"></i>',
@@ -275,6 +332,13 @@
                     iconAnchor: [24, 24]
                 })
             }).addTo(miniMap);
+
+            // Inicializar selector de estilo
+            const select = document.getElementById('mapStyleSelect');
+            if (select) {
+                select.value = currentMapStyle;
+                select.addEventListener('change', (e) => changeMapStyle(e.target.value));
+            }
         }
 
         onSnapshot(query(collection(db, "viajes"), where("taxiId", "==", auth.currentUser.uid), where("status", "==", "pendiente")), snap => {
@@ -369,7 +433,7 @@
                         }] 
                     },
                     router: L.Routing.osrmv1({
-                        serviceUrl: 'https://router.project-osrm.org/route/v1'
+                        serviceUrl: 'https://router.project-osrm.org/route/v1/driving/'
                     }),
                     addWaypoints: false,
                     draggableWaypoints: false,
@@ -403,7 +467,9 @@
             userPos = [p.coords.latitude, p.coords.longitude];
             if(!map) {
                 map = L.map('map', {zoomControl: false}).setView(userPos, 17);
-                L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
+                mainTileLayer = L.tileLayer(getTileUrl(currentMapStyle), {
+                    attribution: '© OpenStreetMap contributors | © CARTO / Stadia'
+                }).addTo(map);
                 L.circleMarker(userPos, {radius: 10, color: '#3498db', fillColor: '#3498db', fillOpacity: 0.7}).addTo(map);
             } else {
                 map.setView(userPos, 17);
