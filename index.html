@@ -5,13 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Wilstaxtion Pro AI - Premium Edition</title>
 
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="manifest" href="./manifest.json">
     <meta name="theme-color" content="#2ecc71">
     <link rel="apple-touch-icon" href="/icons/icon-192.png">
 
-    <!-- Google Maps JS API with 3D support (replace YOUR_API_KEY) -->
-    <script async src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&v=alpha&libraries=maps3d&callback=initGoogleMaps"></script>
+    <!-- OSM Buildings para extrusión 3D de edificios -->
+    <script src="https://cdn.osmbuildings.org/4.1.0/OSMBuildings-Leaflet.js"></script>
 
     <style>
         :root {
@@ -45,8 +47,14 @@
         #miniMapContainer { height: 45vh; position: relative; overflow: hidden; background: #000; }
         #map, #miniMap { height: 100%; width: 100%; }
         
-        /* MOVIMIENTO SUAVE DEL MARCADOR GPS (adaptado para Google) */
-        .marker-icon { transition: transform 0.4s ease-out; }
+        /* MOVIMIENTO SUAVE DEL MARCADOR GPS */
+        .leaflet-marker-pane img,
+        .leaflet-marker-pane .driver-marker {
+            transition: transform 0.4s ease-out !important;
+        }
+        #miniMap .leaflet-marker-pane .driver-marker {
+            transition: transform 0.35s cubic-bezier(0.25, 0.1, 0.25, 1) !important;
+        }
 
         #p-toast { 
             position: fixed; top: 0; left: 0; width: 100%; 
@@ -85,6 +93,7 @@
 
         .color-picker-btn { width: 48px; height: 48px; border-radius: 50%; border: 3px solid #444; cursor: pointer; }
         
+        .leaflet-routing-container { display: none !important; }
     </style>
 </head>
 <body>
@@ -107,7 +116,7 @@
 </div>
 
 <div id="passengerApp" style="display:none; flex-direction:column; min-height:100vh;">
-    <div id="mapContainer"><gmp-map-3d id="map" mode="hybrid" tilt="60" range="1000"></gmp-map-3d></div>
+    <div id="mapContainer"><div id="map"></div></div>
     <div class="p-panel">
         <h3 style="color:var(--primary); margin-bottom:15px;"><i class="fas fa-taxi"></i> Unidades Cercanas</h3>
         <div id="taxiList"></div>
@@ -134,10 +143,12 @@
 
                 <div style="margin: 25px 0 10px; color:#aaa; font-size:0.95em;">Estilo del mapa (GPS)</div>
                 <select id="mapStyleSelect">
-                    <option value="hybrid">Híbrido 3D</option>
-                    <option value="satellite">Satélite 3D</option>
-                    <option value="terrain">Terreno 3D</option>
-                    <option value="roadmap">Mapa de Calle 3D</option>
+                    <option value="carto-dark">Carto Dark (noche)</option>
+                    <option value="osm">OpenStreetMap Classic</option>
+                    <option value="carto-light">Carto Light (día)</option>
+                    <option value="stamen-toner">Toner Voyager (alto contraste)</option>
+                    <option value="alidade-dark">Alidade Smooth Dark</option>
+                    <option value="3d-osm-buildings">3D Edificios OSM</option>
                 </select>
                 
                 <button onclick="saveProfile()" style="width:100%; padding:15px; background:var(--secondary); border:none; border-radius:12px; color:white; font-weight:bold; margin-top:20px;">GUARDAR DATOS</button>
@@ -147,7 +158,7 @@
         <p id="statusLabel" style="color:var(--primary); font-weight:bold;">SISTEMA EN ESPERA</p>
     </div>
     <div id="miniMapContainer">
-        <gmp-map-3d id="miniMap" mode="hybrid" tilt="60" range="1000"></gmp-map-3d>
+        <div id="miniMap"></div>
         <div class="driver-controls" id="driverUI" style="display:none;">
             <button class="btn-action" style="background:var(--primary);" onclick="finishTrip()">TERMINAR SERVICIO</button>
         </div>
@@ -163,6 +174,9 @@
         <button onclick="respondTrip('rechazado', this)" style="flex:1; padding:25px; background:var(--danger); color:white; border:none; border-radius:20px; font-weight:900; font-size: 20px;">RECHAZAR</button>
     </div>
 </div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -182,16 +196,11 @@
     const auth = getAuth(firebaseApp);
     const db = getFirestore(firebaseApp);
 
-    let role = 'pasajero', map3D, miniMap3D, userPos, lastPos = null, myMarker, routingControl, geoWatch;
+    let role = 'pasajero', map, miniMap, userPos, lastPos = null, myMarker, routingControl, geoWatch;
     let loggedUserName = "Conductor", inTrip = false, callInterval;
     let currentRouteColor = localStorage.getItem('routeColor') || '#2ecc71';
-    let currentMapStyle = localStorage.getItem('mapStyle') || 'hybrid';
-    let directionsService, directionsRenderer;
-
-    function initGoogleMaps() {
-        directionsService = new google.maps.DirectionsService();
-        directionsRenderer = new google.maps.DirectionsRenderer({suppressMarkers: true});
-    }
+    let currentMapStyle = localStorage.getItem('mapStyle') || 'carto-dark';
+    let mainTileLayer, miniTileLayer, osmBuildingsLayer;
 
     function hablarIA(texto) {
         window.speechSynthesis.cancel();
@@ -225,20 +234,96 @@
     window.changeRouteColor = (color) => {
         currentRouteColor = color;
         localStorage.setItem('routeColor', color);
-        if (directionsRenderer) {
-            directionsRenderer.setOptions({
-                polylineOptions: { strokeColor: color }
-            });
+        
+        if (routingControl && inTrip) {
+            const waypoints = routingControl.getWaypoints().filter(w => w.latLng);
+            if (waypoints.length >= 2) {
+                miniMap.removeControl(routingControl);
+                routingControl = L.Routing.control({
+                    waypoints: waypoints,
+                    createMarker: () => null,
+                    lineOptions: { styles: [{ color: currentRouteColor, weight: 8, opacity: 0.92 }] },
+                    addWaypoints: false,
+                    draggableWaypoints: false,
+                    fitSelectedRoutes: true,
+                    router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1/driving/' })
+                }).addTo(miniMap);
+            }
         }
+        
         hablarIA(`Color de ruta cambiado a ${color === '#2ecc71' ? 'verde' : color === '#3498db' ? 'azul' : 'otro color seleccionado'}.`);
     };
 
+    function getTileUrl(style) {
+        const providers = {
+            'carto-dark':   'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+            'osm':          'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+            'carto-light':  'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+            'stamen-toner': 'https://tiles.stadiamaps.com/tiles/stamen_toner/{z}/{x}/{y}{r}.png',
+            'alidade-dark': 'https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png',
+        };
+        return providers[style] || providers['carto-dark'];
+    }
+
     function changeMapStyle(style) {
         currentMapStyle = style;
+        const is3D = style === '3d-osm-buildings';
+
+        // Remover capas anteriores
+        if (miniTileLayer) miniMap.removeLayer(miniTileLayer);
+        if (mainTileLayer && map) map.removeLayer(mainTileLayer);
+        if (osmBuildingsLayer) {
+            miniMap.removeLayer(osmBuildingsLayer);
+            if (map) map.removeLayer(osmBuildingsLayer);
+            osmBuildingsLayer = null;
+        }
+
+        if (is3D) {
+            // Capa base OSM (necesaria para OSM Buildings)
+            const url = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+            miniTileLayer = L.tileLayer(url, {
+                attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+                maxZoom: 19
+            }).addTo(miniMap);
+
+            if (map) {
+                mainTileLayer = L.tileLayer(url, {attribution: miniTileLayer.options.attribution}).addTo(map);
+            }
+
+            // Activar OSM Buildings (edificios 3D)
+            osmBuildingsLayer = new OSMBuildingsLeaflet({
+                baseUrl: 'https://a.osmbuildings.org/0.2/anonymous/tile/{z}/{x}/{y}.json',
+                minZoom: 15,
+                maxZoom: 20,
+                heightScale: 1.2,
+                color: '#cccccc',
+                roofColor: '#f0f0f0',
+                fadeIn: true
+            });
+
+            osmBuildingsLayer.addTo(miniMap);
+            if (map) osmBuildingsLayer.addTo(map);
+
+            hablarIA("Modo 3D con edificios activado (OSM Buildings)");
+        } else {
+            // Modo 2D normal
+            const url = getTileUrl(style);
+            miniTileLayer = L.tileLayer(url, {
+                attribution: '© OpenStreetMap contributors | Proveedores seleccionados',
+                subdomains: 'abcd',
+                maxZoom: 19,
+                tileSize: 512,
+                zoomOffset: -1
+            }).addTo(miniMap);
+
+            if (map) {
+                mainTileLayer = L.tileLayer(url, {attribution: miniTileLayer.options.attribution}).addTo(map);
+            }
+
+            hablarIA(`Mapa cambiado a ${style.replace('-', ' ')}`);
+        }
+
         localStorage.setItem('mapStyle', style);
-        if (map3D) map3D.mode = style;
-        if (miniMap3D) miniMap3D.mode = style;
-        hablarIA(`Mapa cambiado a ${style}.`);
     }
 
     window.handleAuth = async () => {
@@ -278,31 +363,24 @@
 
     function startTaxi() {
         loadSavedProfile();
-        miniMap3D = document.getElementById('miniMap');
-        miniMap3D.mode = currentMapStyle;
-        miniMap3D.tilt = 60;
-        miniMap3D.range = 1000;
-        miniMap3D.center = '13.6929,-89.2182,100';  // Centro en San Salvador por defecto
+        if(!miniMap) {
+            miniMap = L.map('miniMap', {zoomControl: false}).setView([13.6929, -89.2182], 15);
+            myMarker = L.marker([0,0], {
+                icon: L.divIcon({
+                    html: '<i class="fas fa-location-arrow" style="color:var(--primary); font-size:40px; transform:rotate(-45deg);"></i>',
+                    className: 'driver-marker',
+                    iconSize: [48, 48],
+                    iconAnchor: [24, 24]
+                })
+            }).addTo(miniMap);
 
-        directionsRenderer.setMap(miniMap3D);
-
-        myMarker = new google.maps.Marker({
-            position: {lat: 0, lng: 0},
-            map: miniMap3D,
-            icon: {
-                path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
-                scale: 6,
-                fillColor: 'var(--primary)',
-                fillOpacity: 1,
-                strokeWeight: 2
+            // Inicializar selector y aplicar estilo guardado
+            const select = document.getElementById('mapStyleSelect');
+            if (select) {
+                select.value = currentMapStyle;
+                select.addEventListener('change', (e) => changeMapStyle(e.target.value));
             }
-        });
-
-        // Inicializar selector de estilo
-        const select = document.getElementById('mapStyleSelect');
-        if (select) {
-            select.value = currentMapStyle;
-            select.addEventListener('change', (e) => changeMapStyle(e.target.value));
+            changeMapStyle(currentMapStyle);
         }
 
         onSnapshot(query(collection(db, "viajes"), where("taxiId", "==", auth.currentUser.uid), where("status", "==", "pendiente")), snap => {
@@ -333,9 +411,8 @@
             geoWatch = navigator.geolocation.watchPosition(p => {
                 const c = [p.coords.latitude, p.coords.longitude];
                 lastPos = c;
-                myMarker.setPosition({lat: c[0], lng: c[1]});
-                miniMap3D.center = `${c[0]},${c[1]},100`;
-                miniMap3D.heading = p.coords.heading || 0; // Rotación basada en heading si disponible
+                if(myMarker) myMarker.setLatLng(c);
+                if(miniMap && !inTrip) miniMap.flyTo(c, 17, { animate: true, duration: 1.2 });
                 
                 const pInfo = JSON.parse(localStorage.getItem('driverProfile')) || {auto:"Taxi", placa:"---"};
                 setDoc(doc(db, "activos", auth.currentUser.uid), {
@@ -382,21 +459,30 @@
 
                 hablarIA("Viaje aceptado. Ruta trazada hacia el pasajero.");
 
-                // Ruta con Google Directions (reemplaza OSRM)
-                directionsService.route({
-                    origin: {lat: lastPos[0], lng: lastPos[1]},
-                    destination: {lat: window.pLoc[0], lng: window.pLoc[1]},
-                    travelMode: 'DRIVING'
-                }, (response, status) => {
-                    if (status === 'OK') {
-                        directionsRenderer.setDirections(response);
-                    } else {
-                        console.error('Error en ruta:', status);
-                    }
-                });
+                if (routingControl) miniMap.removeControl(routingControl);
+                
+                routingControl = L.Routing.control({
+                    waypoints: [
+                        L.latLng(lastPos[0], lastPos[1]),
+                        L.latLng(window.pLoc[0], window.pLoc[1])
+                    ],
+                    createMarker: () => null,
+                    lineOptions: { 
+                        styles: [{ 
+                            color: currentRouteColor, 
+                            weight: 8, 
+                            opacity: 0.92 
+                        }] 
+                    },
+                    router: L.Routing.osrmv1({
+                        serviceUrl: 'https://router.project-osrm.org/route/v1/driving/'
+                    }),
+                    addWaypoints: false,
+                    draggableWaypoints: false,
+                    fitSelectedRoutes: 'smart'
+                }).addTo(miniMap);
 
-                miniMap3D.center = `${lastPos[0]},${lastPos[1]},100`;
-                miniMap3D.range = 1500;
+                miniMap.flyTo(lastPos, 15, { animate: true, duration: 1.5 });
 
             } catch (e) {
                 console.error(e);
@@ -421,24 +507,13 @@
     function startPassenger() {
         navigator.geolocation.getCurrentPosition(p => {
             userPos = [p.coords.latitude, p.coords.longitude];
-            map3D = document.getElementById('map');
-            map3D.mode = currentMapStyle;
-            map3D.tilt = 60;
-            map3D.range = 1000;
-            map3D.center = `${userPos[0]},${userPos[1]},100`;
-
-            // Marcador de posición del pasajero
-            new google.maps.Marker({
-                position: {lat: userPos[0], lng: userPos[1]},
-                map: map3D,
-                icon: {
-                    path: google.maps.SymbolPath.CIRCLE,
-                    scale: 10,
-                    fillColor: '#3498db',
-                    fillOpacity: 0.7,
-                    strokeWeight: 0
-                }
-            });
+            if(!map) {
+                map = L.map('map', {zoomControl: false}).setView(userPos, 17);
+                changeMapStyle(currentMapStyle);  // Aplica estilo inicial
+                L.circleMarker(userPos, {radius: 10, color: '#3498db', fillColor: '#3498db', fillOpacity: 0.7}).addTo(map);
+            } else {
+                map.flyTo(userPos, 17, { animate: true });
+            }
         }, err => console.log("Error geolocalización pasajero:", err), {enableHighAccuracy: true});
 
         onSnapshot(collection(db, "activos"), snap => {
@@ -532,7 +607,10 @@
         });
         hablarIA("Servicio finalizado. Gracias por tu trabajo.");
         inTrip = false;
-        directionsRenderer.setDirections(null);
+        if (routingControl) {
+            miniMap.removeControl(routingControl);
+            routingControl = null;
+        }
         location.reload();
     };
 
