@@ -5,12 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Wilstaxtion Pro AI - Premium Edition</title>
 
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="manifest" href="./manifest.json">
     <meta name="theme-color" content="#2ecc71">
     <link rel="apple-touch-icon" href="/icons/icon-192.png">
+
+    <!-- Google Maps JS API with 3D support (replace YOUR_API_KEY) -->
+    <script async src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&v=alpha&libraries=maps3d&callback=initGoogleMaps"></script>
 
     <style>
         :root {
@@ -44,14 +45,8 @@
         #miniMapContainer { height: 45vh; position: relative; overflow: hidden; background: #000; }
         #map, #miniMap { height: 100%; width: 100%; }
         
-        /* MOVIMIENTO SUAVE DEL MARCADOR GPS */
-        .leaflet-marker-pane img,
-        .leaflet-marker-pane .driver-marker {
-            transition: transform 0.4s ease-out !important;
-        }
-        #miniMap .leaflet-marker-pane .driver-marker {
-            transition: transform 0.35s cubic-bezier(0.25, 0.1, 0.25, 1) !important;
-        }
+        /* MOVIMIENTO SUAVE DEL MARCADOR GPS (adaptado para Google) */
+        .marker-icon { transition: transform 0.4s ease-out; }
 
         #p-toast { 
             position: fixed; top: 0; left: 0; width: 100%; 
@@ -90,7 +85,6 @@
 
         .color-picker-btn { width: 48px; height: 48px; border-radius: 50%; border: 3px solid #444; cursor: pointer; }
         
-        .leaflet-routing-container { display: none !important; }
     </style>
 </head>
 <body>
@@ -113,7 +107,7 @@
 </div>
 
 <div id="passengerApp" style="display:none; flex-direction:column; min-height:100vh;">
-    <div id="mapContainer"><div id="map"></div></div>
+    <div id="mapContainer"><gmp-map-3d id="map" mode="hybrid" tilt="60" range="1000"></gmp-map-3d></div>
     <div class="p-panel">
         <h3 style="color:var(--primary); margin-bottom:15px;"><i class="fas fa-taxi"></i> Unidades Cercanas</h3>
         <div id="taxiList"></div>
@@ -140,11 +134,10 @@
 
                 <div style="margin: 25px 0 10px; color:#aaa; font-size:0.95em;">Estilo del mapa (GPS)</div>
                 <select id="mapStyleSelect">
-                    <option value="carto-dark">Carto Dark (noche)</option>
-                    <option value="osm">OpenStreetMap Classic</option>
-                    <option value="carto-light">Carto Light (día)</option>
-                    <option value="stamen-toner">Toner Voyager (alto contraste)</option>
-                    <option value="alidade-dark">Alidade Smooth Dark</option>
+                    <option value="hybrid">Híbrido 3D</option>
+                    <option value="satellite">Satélite 3D</option>
+                    <option value="terrain">Terreno 3D</option>
+                    <option value="roadmap">Mapa de Calle 3D</option>
                 </select>
                 
                 <button onclick="saveProfile()" style="width:100%; padding:15px; background:var(--secondary); border:none; border-radius:12px; color:white; font-weight:bold; margin-top:20px;">GUARDAR DATOS</button>
@@ -154,7 +147,7 @@
         <p id="statusLabel" style="color:var(--primary); font-weight:bold;">SISTEMA EN ESPERA</p>
     </div>
     <div id="miniMapContainer">
-        <div id="miniMap"></div>
+        <gmp-map-3d id="miniMap" mode="hybrid" tilt="60" range="1000"></gmp-map-3d>
         <div class="driver-controls" id="driverUI" style="display:none;">
             <button class="btn-action" style="background:var(--primary);" onclick="finishTrip()">TERMINAR SERVICIO</button>
         </div>
@@ -170,9 +163,6 @@
         <button onclick="respondTrip('rechazado', this)" style="flex:1; padding:25px; background:var(--danger); color:white; border:none; border-radius:20px; font-weight:900; font-size: 20px;">RECHAZAR</button>
     </div>
 </div>
-
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -192,11 +182,16 @@
     const auth = getAuth(firebaseApp);
     const db = getFirestore(firebaseApp);
 
-    let role = 'pasajero', map, miniMap, userPos, lastPos = null, myMarker, routingControl, geoWatch;
+    let role = 'pasajero', map3D, miniMap3D, userPos, lastPos = null, myMarker, routingControl, geoWatch;
     let loggedUserName = "Conductor", inTrip = false, callInterval;
     let currentRouteColor = localStorage.getItem('routeColor') || '#2ecc71';
-    let currentMapStyle = localStorage.getItem('mapStyle') || 'carto-dark';
-    let mainTileLayer, miniTileLayer;
+    let currentMapStyle = localStorage.getItem('mapStyle') || 'hybrid';
+    let directionsService, directionsRenderer;
+
+    function initGoogleMaps() {
+        directionsService = new google.maps.DirectionsService();
+        directionsRenderer = new google.maps.DirectionsRenderer({suppressMarkers: true});
+    }
 
     function hablarIA(texto) {
         window.speechSynthesis.cancel();
@@ -230,55 +225,20 @@
     window.changeRouteColor = (color) => {
         currentRouteColor = color;
         localStorage.setItem('routeColor', color);
-        
-        if (routingControl && inTrip) {
-            const waypoints = routingControl.getWaypoints().filter(w => w.latLng);
-            if (waypoints.length >= 2) {
-                miniMap.removeControl(routingControl);
-                routingControl = L.Routing.control({
-                    waypoints: waypoints,
-                    createMarker: () => null,
-                    lineOptions: { styles: [{ color: currentRouteColor, weight: 8, opacity: 0.92 }] },
-                    addWaypoints: false,
-                    draggableWaypoints: false,
-                    fitSelectedRoutes: true,
-                    router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1/driving/' })
-                }).addTo(miniMap);
-            }
+        if (directionsRenderer) {
+            directionsRenderer.setOptions({
+                polylineOptions: { strokeColor: color }
+            });
         }
-        
         hablarIA(`Color de ruta cambiado a ${color === '#2ecc71' ? 'verde' : color === '#3498db' ? 'azul' : 'otro color seleccionado'}.`);
     };
 
-    function getTileUrl(style) {
-        const providers = {
-            'carto-dark':   'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-            'osm':          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-            'carto-light':  'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-            'stamen-toner': 'https://tiles.stadiamaps.com/tiles/stamen_toner/{z}/{x}/{y}{r}.png',
-            'alidade-dark': 'https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png',
-        };
-        return providers[style] || providers['carto-dark'];
-    }
-
     function changeMapStyle(style) {
         currentMapStyle = style;
-        const url = getTileUrl(style);
-
-        if (miniTileLayer) miniMap.removeLayer(miniTileLayer);
-        miniTileLayer = L.tileLayer(url, {
-            attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors | © CARTO / Stadia',
-            subdomains: 'abcd'
-        }).addTo(miniMap);
-
-        if (map && mainTileLayer) {
-            map.removeLayer(mainTileLayer);
-            mainTileLayer = L.tileLayer(url, {
-                attribution: miniTileLayer.options.attribution
-            }).addTo(map);
-        }
-
-        hablarIA(`Mapa cambiado a ${style.replace('-', ' ')}`);
+        localStorage.setItem('mapStyle', style);
+        if (map3D) map3D.mode = style;
+        if (miniMap3D) miniMap3D.mode = style;
+        hablarIA(`Mapa cambiado a ${style}.`);
     }
 
     window.handleAuth = async () => {
@@ -318,27 +278,31 @@
 
     function startTaxi() {
         loadSavedProfile();
-        if(!miniMap) {
-            miniMap = L.map('miniMap', {zoomControl: false}).setView([0,0], 19);
-            miniTileLayer = L.tileLayer(getTileUrl(currentMapStyle), {
-                attribution: '© OpenStreetMap contributors | © CARTO / Stadia'
-            }).addTo(miniMap);
+        miniMap3D = document.getElementById('miniMap');
+        miniMap3D.mode = currentMapStyle;
+        miniMap3D.tilt = 60;
+        miniMap3D.range = 1000;
+        miniMap3D.center = '13.6929,-89.2182,100';  // Centro en San Salvador por defecto
 
-            myMarker = L.marker([0,0], {
-                icon: L.divIcon({
-                    html: '<i class="fas fa-location-arrow" style="color:var(--primary); font-size:40px; transform:rotate(-45deg);"></i>',
-                    className: 'driver-marker',
-                    iconSize: [48, 48],
-                    iconAnchor: [24, 24]
-                })
-            }).addTo(miniMap);
+        directionsRenderer.setMap(miniMap3D);
 
-            // Inicializar selector de estilo
-            const select = document.getElementById('mapStyleSelect');
-            if (select) {
-                select.value = currentMapStyle;
-                select.addEventListener('change', (e) => changeMapStyle(e.target.value));
+        myMarker = new google.maps.Marker({
+            position: {lat: 0, lng: 0},
+            map: miniMap3D,
+            icon: {
+                path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+                scale: 6,
+                fillColor: 'var(--primary)',
+                fillOpacity: 1,
+                strokeWeight: 2
             }
+        });
+
+        // Inicializar selector de estilo
+        const select = document.getElementById('mapStyleSelect');
+        if (select) {
+            select.value = currentMapStyle;
+            select.addEventListener('change', (e) => changeMapStyle(e.target.value));
         }
 
         onSnapshot(query(collection(db, "viajes"), where("taxiId", "==", auth.currentUser.uid), where("status", "==", "pendiente")), snap => {
@@ -369,8 +333,9 @@
             geoWatch = navigator.geolocation.watchPosition(p => {
                 const c = [p.coords.latitude, p.coords.longitude];
                 lastPos = c;
-                if(myMarker) myMarker.setLatLng(c);
-                if(miniMap && !inTrip) miniMap.setView(c, 17);
+                myMarker.setPosition({lat: c[0], lng: c[1]});
+                miniMap3D.center = `${c[0]},${c[1]},100`;
+                miniMap3D.heading = p.coords.heading || 0; // Rotación basada en heading si disponible
                 
                 const pInfo = JSON.parse(localStorage.getItem('driverProfile')) || {auto:"Taxi", placa:"---"};
                 setDoc(doc(db, "activos", auth.currentUser.uid), {
@@ -417,30 +382,21 @@
 
                 hablarIA("Viaje aceptado. Ruta trazada hacia el pasajero.");
 
-                if (routingControl) miniMap.removeControl(routingControl);
-                
-                routingControl = L.Routing.control({
-                    waypoints: [
-                        L.latLng(lastPos[0], lastPos[1]),
-                        L.latLng(window.pLoc[0], window.pLoc[1])
-                    ],
-                    createMarker: () => null,
-                    lineOptions: { 
-                        styles: [{ 
-                            color: currentRouteColor, 
-                            weight: 8, 
-                            opacity: 0.92 
-                        }] 
-                    },
-                    router: L.Routing.osrmv1({
-                        serviceUrl: 'https://router.project-osrm.org/route/v1/driving/'
-                    }),
-                    addWaypoints: false,
-                    draggableWaypoints: false,
-                    fitSelectedRoutes: 'smart'
-                }).addTo(miniMap);
+                // Ruta con Google Directions (reemplaza OSRM)
+                directionsService.route({
+                    origin: {lat: lastPos[0], lng: lastPos[1]},
+                    destination: {lat: window.pLoc[0], lng: window.pLoc[1]},
+                    travelMode: 'DRIVING'
+                }, (response, status) => {
+                    if (status === 'OK') {
+                        directionsRenderer.setDirections(response);
+                    } else {
+                        console.error('Error en ruta:', status);
+                    }
+                });
 
-                miniMap.setView(lastPos, 15);
+                miniMap3D.center = `${lastPos[0]},${lastPos[1]},100`;
+                miniMap3D.range = 1500;
 
             } catch (e) {
                 console.error(e);
@@ -465,15 +421,24 @@
     function startPassenger() {
         navigator.geolocation.getCurrentPosition(p => {
             userPos = [p.coords.latitude, p.coords.longitude];
-            if(!map) {
-                map = L.map('map', {zoomControl: false}).setView(userPos, 17);
-                mainTileLayer = L.tileLayer(getTileUrl(currentMapStyle), {
-                    attribution: '© OpenStreetMap contributors | © CARTO / Stadia'
-                }).addTo(map);
-                L.circleMarker(userPos, {radius: 10, color: '#3498db', fillColor: '#3498db', fillOpacity: 0.7}).addTo(map);
-            } else {
-                map.setView(userPos, 17);
-            }
+            map3D = document.getElementById('map');
+            map3D.mode = currentMapStyle;
+            map3D.tilt = 60;
+            map3D.range = 1000;
+            map3D.center = `${userPos[0]},${userPos[1]},100`;
+
+            // Marcador de posición del pasajero
+            new google.maps.Marker({
+                position: {lat: userPos[0], lng: userPos[1]},
+                map: map3D,
+                icon: {
+                    path: google.maps.SymbolPath.CIRCLE,
+                    scale: 10,
+                    fillColor: '#3498db',
+                    fillOpacity: 0.7,
+                    strokeWeight: 0
+                }
+            });
         }, err => console.log("Error geolocalización pasajero:", err), {enableHighAccuracy: true});
 
         onSnapshot(collection(db, "activos"), snap => {
@@ -567,10 +532,7 @@
         });
         hablarIA("Servicio finalizado. Gracias por tu trabajo.");
         inTrip = false;
-        if (routingControl) {
-            miniMap.removeControl(routingControl);
-            routingControl = null;
-        }
+        directionsRenderer.setDirections(null);
         location.reload();
     };
 
